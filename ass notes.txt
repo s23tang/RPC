@@ -1,0 +1,57 @@
+///////////////////////////////////////////////////
+
+Ass 3 notes
+
+///////////////////////////////////////////////////
+
+*****TA's never make mistakes with respects to parameters!!
+     Only some things like not registering before invoking server execute, etc
+
+--------SUMMARY----------------
+First CLIENT requests from BINDER
+
+
+
+-----PROTOCOL---------
+Messages that need to be sent: sever/binder, client/binder, client/server
+in the form:	Length, Type, Message
+
+Length: integer for length of message
+Type:	integer indicating type 
+Message: the actual message
+* Type is in "all caps" use variable size memory to allocate space for
+  function names
+ 
+The following messages will have length excluded for simplicity
+(SERVER/BINDER MESSAGE)
+	REGISTER, server_identifier, port, name, argTypes
+	  {type}  {                Message               }
+	assume fixed length for IP address or hostname, port and name
+	RETURN: REGISTER_SUCCESS or REGISTER_FAILURE and integer for warning or error following
+
+(CLIENT/BINDER MESSAGE)
+from CLIENTS to BINDER used to locate appropriate server procedure:
+	LOC_REQUEST, name, argTypes
+	 {type}		{ message 	  }
+	name and argTypes are parameters from rpcCall
+	assume fixed length for name
+	RETURN:	
+		On success: LOC_SUCCESS, server_identifier, port
+		assume fixed length for both
+		On request failed: LOC_FAILURE, reasonCode
+		where reasonCode is integer for failure condition
+
+(CLIENT/SERVER MESSAGE)
+from CLIENT to SERVERS to request execution of server procedure
+	EXECUTE, name, argTypes, args
+	RETURN:
+		On success: EXECUTE_SUCCESS, name, argTypes, args
+		on fail:	EXECUTE_FAILURE, reasonCode
+		reasonCode is integer representing reason for failure
+
+--------TERMINATE MESSAGES-------------
+For terminating the binder and the servers, client sends the following
+	TERMINATE
+to binder. Binder sends to all servers, servers verify msg is from binder.
+Then terminate
+
