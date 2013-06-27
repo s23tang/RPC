@@ -132,6 +132,11 @@ int main(int argc, const char *argv[]) {
                                 
                                 switch (typeBuf) {
                                     case REGISTER:
+                                        
+                                        char server_identifier[128];
+                                        char name[128];
+                                        int server_port;
+                                        
                                         break;
                                     case LOC_REQUEST:
                                         break;
