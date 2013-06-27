@@ -9,6 +9,9 @@
 #ifndef RPC_error_h
 #define RPC_error_h
 
-#define EGHOST 1
-
+#define EHOST   1
+#define ESOCK   2
+#define EBIND   3
+#define ELISTEN 4
+#define ESNAME  5
 #endif

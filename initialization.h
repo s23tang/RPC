@@ -10,5 +10,6 @@
 #define __RPC__initialization__
 
 void binderInit(struct BinderInfo *binderinfo);
+void *get_in_addr(struct sockaddr *sa);
 
 #endif /* defined(__RPC__initialization__) */
