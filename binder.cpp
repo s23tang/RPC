@@ -19,6 +19,7 @@
 
 #include "binder.h"
 #include "initialization.h"
+#include "message.h"
 
 using namespace std;
 
@@ -49,7 +50,8 @@ int main(int argc, const char *argv[]) {
     int maxFdNum = listener;
     int clientNum = 0;
     int nbytes;       // nbytes recived by message
-    int intBuf;       // buf to recieve message length
+    int lenBuf;       // buf to recieve message length
+    int typeBuf;       // buf to recieve message type
     char *strBuf;     // buf to recieve message string
     
     while (true) {
@@ -84,7 +86,7 @@ int main(int argc, const char *argv[]) {
                     //                    memset(&buf[0], 0, sizeof(buf));
                     
                     // recieve the length of the message
-                    if ((nbytes = (int) recv(i, &intBuf, sizeof(int), 0)) <= 0) {
+                    if ((nbytes = (int) recv(i, &lenBuf, sizeof(int), 0)) <= 0) {
                         // got error or connection closed by client
                         if (nbytes == 0) {
                             // connection closed
@@ -98,7 +100,7 @@ int main(int argc, const char *argv[]) {
                     } else {
                         // recieve the type of the message
                         
-                        if ((nbytes = (int) recv(i, &intBuf, sizeof(int), 0)) <= 0) {
+                        if ((nbytes = (int) recv(i, &typeBuf, sizeof(int), 0)) <= 0) {
                             // got invalid message or connection closed by client
                             if (nbytes == 0) {
                                 // get
@@ -110,7 +112,7 @@ int main(int argc, const char *argv[]) {
                             FD_CLR(i, &master);
                             clientNum--;
                         } else {
-                            strBuf = new char[intBuf + 1];
+                            strBuf = new char[lenBuf + 1];
                             
                             if ((nbytes = (int) recv(i, &strBuf, sizeof(strBuf), 0)) <= 0) {
                                 // got invalid message or connection closed by client
@@ -125,6 +127,19 @@ int main(int argc, const char *argv[]) {
                                 clientNum--;
                             } else {
                             cout << strBuf << endl;
+                                
+                                switch (typeBuf) {
+                                    case REGISTER:
+                                        break;
+                                    case LOC_REQUEST:
+                                        break;
+                                    case EXECUTE:
+                                        break;
+                                    case TERMINATE:
+                                        break;
+                                    default:
+                                        break;
+                                }
                             
                             // we got some data from client
                             for (int j = 0; j <=maxFdNum ; j++) {
@@ -133,9 +148,9 @@ int main(int argc, const char *argv[]) {
                                     // except the listener and ourselves
                                     if (j == i) {
                                         
-                                        if (send(j , modifed_str, nbytes, 0) == -1) {
-                                            cerr << "Server: Send error." << endl;
-                                        }
+//                                        if (send(j , modifed_str, nbytes, 0) == -1) {
+//                                            cerr << "Server: Send error." << endl;
+//                                        }
                                     }
                                 }
                             }
