@@ -11,9 +11,9 @@
 
 #include <iostream>
 
-struct BinderInfo {
+struct Info {
     char *address;
-    short port;
+    unsigned short port;
     int sockfd;
 };
 

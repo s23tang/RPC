@@ -17,7 +17,8 @@ extern "C" {
 #define ARG_INPUT   31
 #define ARG_OUTPUT  30
     
-    
+    extern int s_c_sock;				// socket for listening to clients
+	extern int binder_sock;				// socket for connection with binder
     typedef int (*skeleton)(int *, void **);
     
     extern int rpcInit();

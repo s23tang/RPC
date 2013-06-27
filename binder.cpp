@@ -26,7 +26,7 @@ using namespace std;
 
 int main(int argc, const char *argv[]) {
     
-    struct BinderInfo *binderInfo = new BinderInfo();
+    struct Info *info = new Info();
     
     struct sockaddr_storage client; // client address
     int new_accept;                 // newly accepted fd
@@ -37,12 +37,14 @@ int main(int argc, const char *argv[]) {
     fd_set temp;                    // temp fd list
     
     // initialize the binder and set the listener
-    binderInit(binderInfo);
-    int listener = binderInfo->sockfd;
+    result = Init(info);
+	if (result < 0) exit(result);
+	
+    int listener = info->sockfd;
     
     // print the binder infomation
-    cout << "BINDER_ADDRESS " << binderInfo->address << endl;
-    cout << "BINDER_PORT    " << binderInfo->port << endl;
+    cout << "BINDER_ADDRESS " << info->address << endl;
+    cout << "BINDER_PORT    " << info->port << endl;
     
     FD_SET(listener, &master);
     
@@ -159,8 +161,7 @@ int main(int argc, const char *argv[]) {
                 }
             }
         }
-        
-        return 0;
         }
     }
-    }
+	return 0;
+}
