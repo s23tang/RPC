@@ -25,8 +25,8 @@
 #define NAME_SIZE			100
 #define PORT_SIZE			2
 
-struct message {
-    char server_identifier[128];
+struct Message {
+    char *server_identifier;
     int *argTypes;
     unsigned short port;
     char *name;
@@ -34,5 +34,6 @@ struct message {
     void **args;
 };
 
+struct Message *parseMessage(char *buf, int msgType);
 
 #endif

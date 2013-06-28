@@ -63,7 +63,7 @@ int Init(struct Info *info) {
         return(ELISTEN);
     }
     
-    binderinfo->sockfd = sockfd;
+    info->sockfd = sockfd;
 	
 	socklen_t len = sizeof(taddr);
 	result = getsockname(sockfd, (struct sockaddr *)&taddr, &len);

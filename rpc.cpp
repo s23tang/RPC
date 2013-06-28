@@ -22,6 +22,7 @@
 #include "initialization.h"
 #include "message.h"
 #include "rpc.h"
+#include "server_func.h"
 
 using namespace std;
 

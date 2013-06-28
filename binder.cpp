@@ -130,13 +130,13 @@ int main(int argc, const char *argv[]) {
                             } else {
                             cout << strBuf << endl;
                                 
+                                Message *msg = new Message();
+                                
                                 switch (typeBuf) {
                                     case REGISTER:
                                         
-                                        char server_identifier[128];
-                                        char name[128];
-                                        int server_port;
-										
+                                        msg = parseMessage(strBuf, typeBuf);
+                                        
                                         
                                         break;
                                     case LOC_REQUEST:
