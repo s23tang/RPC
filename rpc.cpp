@@ -70,7 +70,7 @@ extern int rpcInit()
 		
 		break;						// found good socket descriptor
 	}
-	if (counter == NULL) ESOCK;
+	if (counter == NULL) return ESOCK;
 	
 	freeaddrinfo(res);
 	
@@ -92,6 +92,8 @@ extern int rpcRegister(char* name, int* argTypes, skeleton f) {
 	int argType_size;			// size of argTypes
 	int length;					// length of the message portion
 	int result;					// for error checking
+	int ret_type;				// whether REGISTER_SUCCESS or REGISTER_FAILURE
+	int ret_val;				// warnings or errors returned
 	
     for (argType_size=0; argTypes[argType_size]!=0; argType_size++);
 	argType_size = 4*(argType_size+1);			// 4 bytes per element counting 0 at the end
@@ -110,10 +112,15 @@ extern int rpcRegister(char* name, int* argTypes, skeleton f) {
 	// buf which is the message to be sent is now filled
 	
 	result = send(binder_sock, (const void *) buf, LENGTH_SIZE + TYPE_SIZE + length, 0);
-	if (result != 0) return -7;
+	if (result != 0) return ESEND;
 	
+	result = recv(binder_sock, &ret_type, 4, 0);
+	if (result != 0) return ERECV;
 	
-	
+	if (ret_type == REGISTER_SUCCESS) {
+		result = recv(binder_sock, &ret_val, 4, 0);
+		
+	}
 }
 
 extern int rpcExecute() {
