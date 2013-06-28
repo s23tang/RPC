@@ -28,7 +28,7 @@ using namespace std;
 extern int rpcInit() 
 {
 	// set up socket for listening
-	struct Info *info = new Info();
+	info = new Info();
     struct sockaddr_storage client; // client address
     int new_accept;                 // newly accepted fd
     int result;                     // return value
@@ -39,8 +39,6 @@ extern int rpcInit()
     
     result = Init(info);
 	if (result < 0) return result;
-	
-    s_c_sock = info->sockfd;
 	
 	/* done creating socket for acceting connections from clients */
 	
@@ -75,11 +73,12 @@ extern int rpcInit()
 	
 	freeaddrinfo(res);
 	
+	delete info;
+	
 	return 0;
 }
 
 extern int rpcCall(char* name, int* argTypes, void** args) {
-    
 
 }
 
@@ -88,7 +87,32 @@ extern int rpcCacheCall(char* name, int* argTypes, void** args) {
 }
 
 extern int rpcRegister(char* name, int* argTypes, skeleton f) {
-    
+    // count size of argTypes
+	int argType_size;			// size of argTypes
+	int length;					// length of the message portion
+	int result;					// for error checking
+	
+    for (argType_size=0; argTypes[argType_size]!=0; argType_size++);
+	argType_size = 4*(argType_size+1);			// 4 bytes per element counting 0 at the end
+	
+	length = SERVER_ID_SIZE + PORT_SIZE + NAME_SIZE + argType_size;
+	
+	char *buf = new char[LENGTH_SIZE + TYPE_SIZE + length];
+	
+	memcpy(buf, length, LENGTH_SIZE);
+	memcpy(buf+4, REGISTER, TYPE_SIZE);
+	memcpy(buf+8, info->address, SERVER_ID_SIZE);
+	memcpy(buf+136, info->port, PORT_SIZE);
+	strncpy(buf+138, name, NAME_SIZE);
+	memcpy(buf+238, argTypes, argType_size);
+	
+	// buf which is the message to be sent is now filled
+	
+	result = send(binder_sock, (const void *) buf, LENGTH_SIZE + TYPE_SIZE + length, 0);
+	if (result != 0) return -7;
+	
+	
+	
 }
 
 extern int rpcExecute() {

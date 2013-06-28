@@ -15,4 +15,5 @@
 #define ELISTEN -4
 #define ESNAME  -5
 #define EGADDR  -6
+#define ESEND   -7
 #endif

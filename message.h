@@ -19,11 +19,16 @@
 #define EXECUTE_SUCCESS     7
 #define EXECUTE_FAILURE     8
 #define TERMINATE           9
+#define LENGTH_SIZE			4
+#define TYPE_SIZE			4
+#define SERVER_ID_SIZE		128
+#define NAME_SIZE			100
+#define PORT_SIZE			2
 
 struct message {
     char server_identifier[128];
     int *argTypes;
-    short port;
+    unsigned short port;
     char *name;
     int reasonCode;
     void **args;
