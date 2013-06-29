@@ -140,7 +140,7 @@ extern int rpcRegister(char* name, int* argTypes, skeleton f) {
 	
 	// add the entry to the local database;
 	
-	server_db.push_back(server_entry);
+	server_db.push_back(server_entry);				// NOTE: could be registering the same function, same name, etc, SO CHECK THIS SOON
 	
 	return ret_val;				// return either the warning or a 0 for success
 }
