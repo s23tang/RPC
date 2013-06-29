@@ -140,6 +140,9 @@ extern int rpcRegister(char* name, int* argTypes, skeleton f) {
 	
 	// add the entry to the local database;
 	
+	// must do a check here, that does: check if a function with the exact same name, and same argTypes exists
+	//   if that exists, free that one and updated with the new one.
+	
 	server_db.push_back(server_entry);				// NOTE: could be registering the same function, same name, etc, SO CHECK THIS SOON
 	
 	return ret_val;				// return either the warning or a 0 for success
