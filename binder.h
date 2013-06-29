@@ -9,7 +9,6 @@
 #ifndef __RPC__binder__
 #define __RPC__binder__
 
-#include <iostream>
 #include <list>
 
 struct Info {
@@ -25,6 +24,6 @@ struct db_struct {
 	char *port;
 };
 
-extern std::list<db_struct> binder_db;
+std::list<db_struct*> binder_db;
 
 #endif /* defined(__RPC__binder__) */

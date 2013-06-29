@@ -106,7 +106,7 @@ extern int rpcRegister(char* name, int* argTypes, skeleton f) {
 	memcpy(buf+4, REGISTER, TYPE_SIZE);
 	memcpy(buf+8, info->address, SERVER_ID_SIZE);
 	memcpy(buf+136, info->port, PORT_SIZE);
-	strncpy(buf+138, name, NAME_SIZE);
+	strcpy(buf+138, name, NAME_SIZE);				
 	memcpy(buf+238, argTypes, argType_size);
 	
 	// buf which is the message to be sent is now filled
@@ -114,13 +114,35 @@ extern int rpcRegister(char* name, int* argTypes, skeleton f) {
 	result = send(binder_sock, (const void *) buf, LENGTH_SIZE + TYPE_SIZE + length, 0);
 	if (result != 0) return ESEND;
 	
+	// free buf since we are no longer using it
+	delete [] buf;
+	
 	result = recv(binder_sock, &ret_type, 4, 0);
 	if (result != 0) return ERECV;
+	result = recv(binder_sock, &ret_val, 4, 0);
+	if (result != 0) return ERECV;
 	
-	if (ret_type == REGISTER_SUCCESS) {
-		result = recv(binder_sock, &ret_val, 4, 0);
-		
+	// determine if register success
+	
+	if (ret_type == REGISTER_SUCCESS || ret_type == REGISTER_FAILURE) {
+		if (ret_val < 0) return ret_val;
 	}
+
+	// create the entry to be added into local database
+	
+	server_func *server_entry = new server_func();
+	server_entry->name = new char[strlen(name)+1];
+	server_entry->argTypes = new int[argType_size/4];
+	
+	strcpy(sever_entry->name, name);						// copy the name
+	memcpy(server->argTypes, argTypes, argTypes_size);		// copy the argument types
+	server_entry->func = f;									// copy the skeleton (address of function)
+	
+	// add the entry to the local database;
+	
+	server_db.push_back(server_entry);
+	
+	return ret_val;				// return either the warning or a 0 for success
 }
 
 extern int rpcExecute() {
@@ -128,5 +150,5 @@ extern int rpcExecute() {
 }
 
 extern int rpcTerminate() {
-    
+	// remember to free local database
 }

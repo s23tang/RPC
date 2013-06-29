@@ -5,5 +5,16 @@
  * and for the local database of skeletons
  */
 
-extern Info *info;					// info for server with port and sockets for listening
-extern int binder_sock;				// socket for connection with binder
+ #include <list>
+ #include "rpc.h"
+ 
+Info *info;						// info for server with port and sockets for listening
+int binder_sock;				// socket for connection with binder
+
+struct server_func {
+	char 		*name;
+	int 		*argTypes;
+	skeleton 	func;
+};
+
+std::list<server_func*> server_db;		// local server database
