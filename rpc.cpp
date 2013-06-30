@@ -143,7 +143,24 @@ extern int rpcRegister(char* name, int* argTypes, skeleton f) {
 	// must do a check here, that does: check if a function with the exact same name, and same argTypes exists
 	//   if that exists, free that one and updated with the new one.
 	
-	server_db.push_back(server_entry);				// NOTE: could be registering the same function, same name, etc, SO CHECK THIS SOON
+	int replaced = 0;
+	list<int>::iterator it;
+	for (it=server_db.begin(); it!=server_db.end(); it++) {
+		if (server_entry->name == *it->name) {
+			int i;
+			for (i=0; *it->argTypes[i] != 0; i++);
+			if (argType_size/4 == ++i) {
+				delete [] *it->name;
+				delete [] *it->argTypes;
+				delete [] *it;
+				*it = server_entry;
+				replaced = 1;
+				break;
+			}
+		}
+	}
+	
+	if (replaced == 0) server_db.push_back(server_entry);
 	
 	return ret_val;				// return either the warning or a 0 for success
 }
