@@ -29,7 +29,7 @@ using namespace std;
 extern int rpcInit() 
 {
 	// set up socket for listening
-	info = new Info();
+	server_info = new Info();
     struct sockaddr_storage client; // client address
     int new_accept;                 // newly accepted fd
     int result;                     // return value
@@ -38,7 +38,7 @@ extern int rpcInit()
     fd_set master;                  // master fd list
     fd_set temp;                    // temp fd list
     
-    result = Init(info);
+    result = Init(server_info);
 	if (result < 0) return result;
 	
 	/* done creating socket for acceting connections from clients */
@@ -74,8 +74,6 @@ extern int rpcInit()
 	
 	freeaddrinfo(res);
 	
-	delete info;
-	
 	return 0;
 }
 
@@ -104,8 +102,8 @@ extern int rpcRegister(char* name, int* argTypes, skeleton f) {
 	
 	memcpy(buf, length, LENGTH_SIZE);
 	memcpy(buf+4, REGISTER, TYPE_SIZE);
-	memcpy(buf+8, info->address, SERVER_ID_SIZE);
-	memcpy(buf+136, info->port, PORT_SIZE);
+	memcpy(buf+8, server_info->address, SERVER_ID_SIZE);
+	memcpy(buf+136, server_info->port, PORT_SIZE);
 	strcpy(buf+138, name, NAME_SIZE);				
 	memcpy(buf+238, argTypes, argType_size);
 	
@@ -149,7 +147,7 @@ extern int rpcRegister(char* name, int* argTypes, skeleton f) {
 		if (server_entry->name == *it->name) {
 			int i;
 			for (i=0; *it->argTypes[i] != 0; i++);
-			if (argType_size/4 == ++i) {
+			if (argType_size/4 == ++i) {	// if same size of argument types then replace with latest
 				delete [] *it->name;
 				delete [] *it->argTypes;
 				delete [] *it;
@@ -165,10 +163,130 @@ extern int rpcRegister(char* name, int* argTypes, skeleton f) {
 	return ret_val;				// return either the warning or a 0 for success
 }
 
-extern int rpcExecute() {
+extern int rpcExecute() {	// for this function remember to use threads!!!
+    fd_set master;                  // master fd list
+    fd_set temp;                    // temp fd list
+	int new_accept;                 // newly accepted fd
+	struct sockaddr_storage client; // client address
+	
+	FD_SET(listener, &master);
     
+	int listener = server_info->sockfd;
+    char clientIP[INET_ADDRSTRLEN];
+    int maxFdNum = listener;
+    int clientNum = 0;
+	
+	/* just starting to edit this! copied over from binder.cpp */
+	while (true) {
+        temp = master;
+        if (select(maxFdNum + 1, &temp, NULL, NULL, NULL) == -1) {
+            cerr << "Server: Select error." << endl;
+            return ESELECT;
+        }
+		
+		// run through the existing connections to look for datas to read
+        for (int i = 0; i <= maxFdNum; i++) {
+			if (FD_ISSET(i, &temp)) {
+                if (i == listener) {
+                    // handle new connection
+                    addrlen = sizeof client;
+                    new_accept = accept(listener, (struct sockaddr *) &client, &addrlen);
+                    
+                    if (new_accept == -1) {
+                        cerr << "Server: Accept error." << endl;
+                    } 
+					else {
+                        FD_SET(new_accept, &master);
+                        if (new_accept > maxFdNum) maxFdNum = new_accept;
+                        clientNum++;
+                        
+                        cout << "Server: new connection from " << inet_ntop(client.ss_family, get_in_addr((struct sockaddr*) &client), clientIP, INET6_ADDRSTRLEN) << " on socket " << new_accept << endl;
+                    }
+                } 
+				else {// recieve the length of the message
+                    if ((nbytes = (int) recv(i, &lenBuf, sizeof(int), 0)) <= 0) {
+                        // got error or connection closed by client
+                        if (nbytes == 0) {
+                            // connection closed
+                            cout << "Server: socket " << i << " hung up." << endl;
+                        } 
+						else cerr << "Server: Recieve error." << endl;
+						
+                        close(i);
+                        FD_CLR(i, &master);
+                        clientNum--;
+                    } else {
+                        // recieve the type of the message
+                        
+                        if ((nbytes = (int) recv(i, &typeBuf, sizeof(int), 0)) <= 0) {
+                            // got invalid message or connection closed by client
+                            if (nbytes == 0) {
+                                // get
+                                cout << "Server: socket " << i << " hung up." << endl;
+                            } else {
+                                cerr << "Server: Recieve error." << endl;
+                            }
+                            close(i);
+                            FD_CLR(i, &master);
+                            clientNum--;
+                        } else {
+                            strBuf = new char[lenBuf + 1];
+                            
+                            if ((nbytes = (int) recv(i, &strBuf, sizeof(strBuf), 0)) <= 0) {
+                                // got invalid message or connection closed by client
+                                if (nbytes == 0) {
+                                    // get
+                                    cout << "Server: socket " << i << " hung up." << endl;
+                                } else {
+                                    cerr << "Server: Recieve error." << endl;
+                                }
+                                close(i);
+                                FD_CLR(i, &master);
+                                clientNum--;
+                            } else {
+                            cout << strBuf << endl;
+                                
+                                Message *msg = new Message();
+                                
+                                switch (typeBuf) {
+                                    case REGISTER:
+                                        
+                                        msg = parseMessage(strBuf, typeBuf);
+                                        
+                                        
+                                        break;
+                                    case LOC_REQUEST:
+                                        break;
+                                    case EXECUTE:
+                                        break;
+                                    case TERMINATE:
+                                        break;
+                                    default:
+                                        break;
+                                }
+                            
+                            // we got some data from client
+                            for (int j = 0; j <=maxFdNum ; j++) {
+                                // send to everyone
+                                if (FD_ISSET(j, &master)) {
+                                    // except the listener and ourselves
+                                    if (j == i) {
+                                        
+//                                        if (send(j , modifed_str, nbytes, 0) == -1) {
+//                                            cerr << "Server: Send error." << endl;
+//                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+		}/*for*/
+	}/*while*/
 }
 
 extern int rpcTerminate() {
-	// remember to free local database
+	// remember to free local database and server_info
 }

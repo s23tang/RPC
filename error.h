@@ -17,4 +17,5 @@
 #define EGADDR  -6
 #define ESEND   -7
 #define ERECV 	-8
+#define ESELECT	-9
 #endif
