@@ -19,11 +19,13 @@
 #define EXECUTE_SUCCESS     7
 #define EXECUTE_FAILURE     8
 #define TERMINATE           9
+
 #define LENGTH_SIZE			4
 #define TYPE_SIZE			4
 #define SERVER_ID_SIZE		128
 #define NAME_SIZE			100
 #define PORT_SIZE			2
+#define ARGTYPE_SIZE        4
 
 struct Message {
     char *server_identifier;
@@ -34,6 +36,6 @@ struct Message {
     void **args;
 };
 
-struct Message *parseMessage(char *buf, int msgType);
+struct Message *parseMessage(char *buf, int msgType, int length);
 
 #endif

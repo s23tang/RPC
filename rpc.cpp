@@ -100,24 +100,24 @@ extern int rpcRegister(char* name, int* argTypes, skeleton f) {
 	
 	char *buf = new char[LENGTH_SIZE + TYPE_SIZE + length];
 	
-	memcpy(buf, length, LENGTH_SIZE);
+	memcpy(buf, &length, LENGTH_SIZE);
 	memcpy(buf+4, REGISTER, TYPE_SIZE);
 	memcpy(buf+8, server_info->address, SERVER_ID_SIZE);
-	memcpy(buf+136, server_info->port, PORT_SIZE);
-	strcpy(buf+138, name, NAME_SIZE);				
+	memcpy(buf+136, &server_info->port, PORT_SIZE);
+	strcpy(buf+138, name);				
 	memcpy(buf+238, argTypes, argType_size);
 	
 	// buf which is the message to be sent is now filled
 	
-	result = send(binder_sock, (const void *) buf, LENGTH_SIZE + TYPE_SIZE + length, 0);
+	result = (int) send(binder_sock, (const void *) buf, LENGTH_SIZE + TYPE_SIZE + length, 0);
 	if (result != 0) return ESEND;
 	
 	// free buf since we are no longer using it
 	delete [] buf;
 	
-	result = recv(binder_sock, &ret_type, 4, 0);
+	result = (int) recv(binder_sock, &ret_type, 4, 0);
 	if (result != 0) return ERECV;
-	result = recv(binder_sock, &ret_val, 4, 0);
+	result = (int) recv(binder_sock, &ret_val, 4, 0);
 	if (result != 0) return ERECV;
 	
 	// determine if register success
@@ -132,8 +132,8 @@ extern int rpcRegister(char* name, int* argTypes, skeleton f) {
 	server_entry->name = new char[strlen(name)+1];
 	server_entry->argTypes = new int[argType_size/4];
 	
-	strcpy(sever_entry->name, name);						// copy the name
-	memcpy(server->argTypes, argTypes, argTypes_size);		// copy the argument types
+	strcpy(server_entry->name, name);						// copy the name
+	memcpy(server_entry->argTypes, argTypes, argType_size);		// copy the argument types
 	server_entry->func = f;									// copy the skeleton (address of function)
 	
 	// add the entry to the local database;
@@ -142,15 +142,15 @@ extern int rpcRegister(char* name, int* argTypes, skeleton f) {
 	//   if that exists, free that one and updated with the new one.
 	
 	int replaced = 0;
-	list<int>::iterator it;
+	list<server_func*>::iterator it;
 	for (it=server_db.begin(); it!=server_db.end(); it++) {
-		if (server_entry->name == *it->name) {
+		if (server_entry->name == (*it)->name) {
 			int i;
-			for (i=0; *it->argTypes[i] != 0; i++);
+			for (i=0; (*it)->argTypes[i] != 0; i++);
 			if (argType_size/4 == ++i) {	// if same size of argument types then replace with latest
-				delete [] *it->name;
-				delete [] *it->argTypes;
-				delete [] *it;
+				delete [] (*it)->name;
+				delete [] (*it)->argTypes;
+				delete [] (*it);
 				*it = server_entry;
 				replaced = 1;
 				break;
@@ -169,13 +169,14 @@ extern int rpcExecute() {	// for this function remember to use threads!!!
 	int new_accept;                 // newly accepted fd
 	struct sockaddr_storage client; // client address
 	
-	FD_SET(listener, &master);
     
 	int listener = server_info->sockfd;
     char clientIP[INET_ADDRSTRLEN];
     int maxFdNum = listener;
     int clientNum = 0;
 	
+    FD_SET(listener, &master);
+    
 	/* just starting to edit this! copied over from binder.cpp */
 	while (true) {
         temp = master;

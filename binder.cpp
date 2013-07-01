@@ -135,7 +135,7 @@ int main(int argc, const char *argv[]) {
                                 switch (typeBuf) {
                                     case REGISTER:
                                         
-                                        msg = parseMessage(strBuf, typeBuf);
+                                        msg = parseMessage(strBuf, typeBuf, lenBuf);
                                         
                                         
                                         break;
