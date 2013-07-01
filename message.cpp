@@ -7,6 +7,7 @@
 //
 
 #include "message.h"
+#include "rpc.h"
 #include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
@@ -86,6 +87,8 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
                 num_argTypes++;
             }
             
+            msg->argTypesSize = num_argTypes;
+            
             msg->argTypes = new int[num_argTypes - 1];
             
             // loop to add argTypes
@@ -94,6 +97,58 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
                 buf = buf + ARGTYPE_SIZE;
             }
             
+            // loop to add args
+            for (int j = 0; j < num_argTypes - 1; j++) {
+                int arg_type = (msg->argTypes[j] >> (8*2)) & 0xff;
+                int arg_length = (msg->argTypes[j] >> (8*4)) & 0xff;
+                
+                switch (arg_type) {
+                    case ARG_CHAR: {
+                        char *curArgs = new char[arg_length + 1];
+                        memcpy(curArgs, buf, arg_length);
+                        msg->args[j] = (void *)curArgs;
+                        buf = buf + arg_length;
+                        break;
+                    }
+                    case ARG_SHORT: {
+                        short *curArgs = new short[arg_length];
+                        memcpy(curArgs, buf, arg_length * sizeof(short));
+                        msg->args[j] = (void *)curArgs;
+                        buf = buf + arg_length * sizeof(short);
+                        break;
+                    }
+                    case ARG_INT: {
+                        int *curArgs = new int[arg_length];
+                        memcpy(curArgs, buf, arg_length * sizeof(int));
+                        msg->args[j] = (void *)curArgs;
+                        buf = buf + arg_length * sizeof(int);
+                        break;
+                    }
+                    case ARG_LONG: {
+                        long *curArgs = new long[arg_length];
+                        memcpy(curArgs, buf, arg_length * sizeof(long));
+                        msg->args[j] = (void *)curArgs;
+                        buf = buf + arg_length * sizeof(long);
+                        break;
+                    }
+                    case ARG_DOUBLE: {
+                        double *curArgs = new double[arg_length];
+                        memcpy(curArgs, buf, arg_length * sizeof(double));
+                        msg->args[j] = (void *)curArgs;
+                        buf = buf + arg_length * sizeof(double);
+                        break;
+                    }
+                    case ARG_FLOAT: {
+                        float *curArgs = new float[arg_length];
+                        memcpy(curArgs, buf, arg_length * sizeof(float));
+                        msg->args[j] = (void *)curArgs;
+                        buf = buf + arg_length * sizeof(float);
+                        break;
+                    }
+                    default:
+                        break;
+                }
+            }
             
             break;
         case TERMINATE:

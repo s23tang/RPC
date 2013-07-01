@@ -30,6 +30,7 @@
 struct Message {
     char *server_identifier;
     int *argTypes;
+    int argTypesSize;
     unsigned short port;
     char *name;
     int reasonCode;
