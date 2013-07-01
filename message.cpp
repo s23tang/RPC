@@ -97,7 +97,7 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
                 buf = buf + ARGTYPE_SIZE;
             }
             
-            // loop to add args
+            // loop to loop and add different type of args
             for (int j = 0; j < num_argTypes - 1; j++) {
                 int arg_type = (msg->argTypes[j] >> (8*2)) & 0xff;
                 int arg_length = (msg->argTypes[j] >> (8*4)) & 0xff;
