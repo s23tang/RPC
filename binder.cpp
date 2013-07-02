@@ -53,9 +53,17 @@ int main(int argc, const char *argv[]) {
     int clientNum = 0;
     int nbytes;       // nbytes recived by message
     int lenBuf;       // buf to recieve message length
-    int typeBuf;       // buf to recieve message type
+    int typeBuf;      // buf to recieve message type
     char *strBuf;     // buf to recieve message string
+<<<<<<< HEAD
 
+=======
+    char *sendBuf;    // buf to send the whole message
+    
+    // define the database iterator
+    list<struct db_struct*>::iterator it;
+    
+>>>>>>> 4dd7536a784eb331d9b51c0e3da619361a283491
     while (true) {
         temp = master;
         if (select(maxFdNum + 1, &temp, NULL, NULL, NULL) == -1) {
@@ -128,37 +136,76 @@ int main(int argc, const char *argv[]) {
                                 FD_CLR(i, &master);
                                 clientNum--;
                             } else {
-                            cout << strBuf << endl;
+                                cout << strBuf << endl;
                                 
                                 Message *msg = new Message();
                                 
                                 switch (typeBuf) {
-                                    case REGISTER:
+                                    case REGISTER: {
                                         
+                                        // parse the message we recieved
                                         msg = parseMessage(strBuf, typeBuf, lenBuf);
                                         
+                                        for (it = binder_db.begin(); it != binder_db.end(); it++) {
+                                            if (msg->name == (*it)->name && msg->port == (*it)->port && msg->argTypesSize == (*it)->argTypeSize) {
+                                                bool diff = false;
+                                                for (int i = 0; i < msg->argTypesSize; i++) {
+                                                    if (msg->argTypes[i] != (*it)->argTypes[i]) {
+                                                        diff = true;
+                                                        break;
+                                                    }
+                                                }
+                                                
+                                                if (!diff) {
+                                                    // if same functions from same servers, create success message
+                                                    // with warning of overriding
+                                                    
+                                                    int sendLength = createMessage(sendBuf, REGISTER_SUCCESS, REGISTER_WARNING, msg);
+                                                    result = (int) send(i, sendBuf, sendLength, 0);
+                                                    if (result < 0) {
+                                                        cerr << "Binder: Send error." << endl;
+                                                    }
+                                                }
+                                                
+                                            }
+                                        }
+                                        
+                                        
+                                        
+                                        // add the new function to the database
+                                        struct db_struct* db_entry = new db_struct();
+                                        
+                                        db_entry->address = msg->server_identifier;
+                                        db_entry->port = msg->port;
+                                        db_entry->name = msg->name;
+                                        db_entry->argTypes = new int[msg->argTypesSize];
+                                        for (int i = 0; i < msg->argTypesSize; i++) {
+                                            db_entry->argTypes[i] = msg->argTypes[i];
+                                        }
+                                        
+                                        binder_db.push_back(db_entry);
                                         
                                         break;
+                                    }
                                     case LOC_REQUEST:
-                                        break;
-                                    case EXECUTE:
                                         break;
                                     case TERMINATE:
                                         break;
                                     default:
                                         break;
                                 }
-                            
-                            // we got some data from client
-                            for (int j = 0; j <=maxFdNum ; j++) {
-                                // send to everyone
-                                if (FD_ISSET(j, &master)) {
-                                    // except the listener and ourselves
-                                    if (j == i) {
-                                        
-//                                        if (send(j , modifed_str, nbytes, 0) == -1) {
-//                                            cerr << "Server: Send error." << endl;
-//                                        }
+                                
+                                // we got some data from client
+                                for (int j = 0; j <=maxFdNum ; j++) {
+                                    // send to everyone
+                                    if (FD_ISSET(j, &master)) {
+                                        // except the listener and ourselves
+                                        if (j == i) {
+                                            
+                                            //                                        if (send(j , modifed_str, nbytes, 0) == -1) {
+                                            //                                            cerr << "Server: Send error." << endl;
+                                            //                                        }
+                                        }
                                     }
                                 }
                             }
@@ -166,7 +213,6 @@ int main(int argc, const char *argv[]) {
                     }
                 }
             }
-        }
         }
     }
 	return 0;

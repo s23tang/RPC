@@ -20,12 +20,16 @@
 #define EXECUTE_FAILURE     8
 #define TERMINATE           9
 
+#define REGISTER_WARNING    10
+
 #define LENGTH_SIZE			4
 #define TYPE_SIZE			4
 #define SERVER_ID_SIZE		128
 #define NAME_SIZE			100
 #define PORT_SIZE			2
 #define ARGTYPE_SIZE        4
+
+
 
 struct Message {
     char *server_identifier;
@@ -38,5 +42,7 @@ struct Message {
 };
 
 struct Message *parseMessage(char *buf, int msgType, int length);
+
+int createMessage(char *sendBuf, int msgType, int retCode, struct Message *oldMsg);
 
 #endif

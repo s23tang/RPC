@@ -156,4 +156,68 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
         default:
             break;
     }
+    return msg;
+}
+
+
+
+int createMessage(char *buf, int msgType, int retCode, struct Message *oldMsg) {
+    
+    int msgLength = 0;
+    
+    switch (msgType) {
+        case REGISTER_SUCCESS: {
+            // allocate enough memory for the buffer and update the length of the buffer
+            msgLength = LENGTH_SIZE + TYPE_SIZE + sizeof(int);
+            buf = new char[msgLength];
+            
+            // create the REGISTER_SUCCESS message
+            int length = sizeof(int);
+            memcpy(buf, &length, LENGTH_SIZE);
+            memcpy(buf + LENGTH_SIZE, &msgType, TYPE_SIZE);
+            memcpy(buf + LENGTH_SIZE + TYPE_SIZE, &retCode, sizeof(int));
+            
+            break;
+        }
+        case REGISTER_FAILURE: {
+            // allocate enough memory for the buffer and update the length of the buffer
+            msgLength = LENGTH_SIZE + TYPE_SIZE + sizeof(int);
+            buf = new char[msgLength];
+            
+            // create the REGISTER_FAILURE message
+            int length = sizeof(int);
+            memcpy(buf, &length, LENGTH_SIZE);
+            memcpy(buf + LENGTH_SIZE, &msgType, TYPE_SIZE);
+            memcpy(buf + LENGTH_SIZE + TYPE_SIZE, &retCode, sizeof(int));
+            
+            break;
+        }
+        case LOC_SUCCESS: {
+            // allocate enough memory for the buffer and update the length of the buffer
+            msgLength = LENGTH_SIZE + TYPE_SIZE + SERVER_ID_SIZE + PORT_SIZE;
+            buf = new char[msgLength];
+            
+            // create the LOC_SUCCESS message
+            int length = SERVER_ID_SIZE + PORT_SIZE;
+            memcpy(buf, &length, LENGTH_SIZE);
+            memcpy(buf + LENGTH_SIZE, &msgType, TYPE_SIZE);
+            memcpy(buf + LENGTH_SIZE + TYPE_SIZE, oldMsg->server_identifier, SERVER_ID_SIZE);
+            memcpy(buf + LENGTH_SIZE + TYPE_SIZE + SERVER_ID_SIZE, &(oldMsg->port), PORT_SIZE);
+            
+            break;
+        }
+        case LOC_FAILURE:
+            
+            break;
+        case EXECUTE_SUCCESS:
+            
+            break;
+        case EXECUTE_FAILURE:
+            
+            break;
+    
+        default:
+            break;
+    }
+    return msgLength;
 }
