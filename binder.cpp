@@ -55,15 +55,11 @@ int main(int argc, const char *argv[]) {
     int lenBuf;       // buf to recieve message length
     int typeBuf;      // buf to recieve message type
     char *strBuf;     // buf to recieve message string
-<<<<<<< HEAD
-
-=======
     char *sendBuf;    // buf to send the whole message
     
     // define the database iterator
     list<struct db_struct*>::iterator it;
     
->>>>>>> 4dd7536a784eb331d9b51c0e3da619361a283491
     while (true) {
         temp = master;
         if (select(maxFdNum + 1, &temp, NULL, NULL, NULL) == -1) {
