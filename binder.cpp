@@ -55,7 +55,7 @@ int main(int argc, const char *argv[]) {
     int lenBuf;       // buf to recieve message length
     int typeBuf;       // buf to recieve message type
     char *strBuf;     // buf to recieve message string
-    
+
     while (true) {
         temp = master;
         if (select(maxFdNum + 1, &temp, NULL, NULL, NULL) == -1) {
