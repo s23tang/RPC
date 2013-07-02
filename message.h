@@ -39,6 +39,7 @@ struct Message {
     char *name;
     int reasonCode;
     void **args;
+    int argsLength;
 };
 
 struct Message *parseMessage(char *buf, int msgType, int length);

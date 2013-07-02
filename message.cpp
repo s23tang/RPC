@@ -97,7 +97,9 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
                 buf = buf + ARGTYPE_SIZE;
             }
             
-            // loop to loop and add different type of args
+            // used to update the total length of the args
+            msg->argsLength = 0;
+            // loop to add different type of args
             for (int j = 0; j < num_argTypes - 1; j++) {
                 int arg_type = (msg->argTypes[j] >> (8*2)) & 0xff;
                 int arg_length = (msg->argTypes[j] >> (8*4)) & 0xff;
@@ -108,6 +110,7 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
                         memcpy(curArgs, buf, arg_length);
                         msg->args[j] = (void *)curArgs;
                         buf = buf + arg_length;
+                        msg->argsLength = msg->argsLength + arg_length;
                         break;
                     }
                     case ARG_SHORT: {
@@ -115,6 +118,7 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
                         memcpy(curArgs, buf, arg_length * sizeof(short));
                         msg->args[j] = (void *)curArgs;
                         buf = buf + arg_length * sizeof(short);
+                        msg->argsLength = msg->argsLength + arg_length;
                         break;
                     }
                     case ARG_INT: {
@@ -122,6 +126,7 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
                         memcpy(curArgs, buf, arg_length * sizeof(int));
                         msg->args[j] = (void *)curArgs;
                         buf = buf + arg_length * sizeof(int);
+                        msg->argsLength = msg->argsLength + arg_length;
                         break;
                     }
                     case ARG_LONG: {
@@ -129,6 +134,7 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
                         memcpy(curArgs, buf, arg_length * sizeof(long));
                         msg->args[j] = (void *)curArgs;
                         buf = buf + arg_length * sizeof(long);
+                        msg->argsLength = msg->argsLength + arg_length;
                         break;
                     }
                     case ARG_DOUBLE: {
@@ -136,6 +142,7 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
                         memcpy(curArgs, buf, arg_length * sizeof(double));
                         msg->args[j] = (void *)curArgs;
                         buf = buf + arg_length * sizeof(double);
+                        msg->argsLength = msg->argsLength + arg_length;
                         break;
                     }
                     case ARG_FLOAT: {
@@ -143,6 +150,7 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
                         memcpy(curArgs, buf, arg_length * sizeof(float));
                         msg->args[j] = (void *)curArgs;
                         buf = buf + arg_length * sizeof(float);
+                        msg->argsLength = msg->argsLength + arg_length;
                         break;
                     }
                     default:
@@ -206,16 +214,62 @@ int createMessage(char *buf, int msgType, int retCode, struct Message *oldMsg) {
             
             break;
         }
-        case LOC_FAILURE:
+        case LOC_FAILURE: {
+            // allocate enough memory for the buffer and update the length of the buffer
+            msgLength = LENGTH_SIZE + TYPE_SIZE + sizeof(int);
+            buf = new char[msgLength];
+            
+            // create the LOC_FAILURE message
+            int length = sizeof(int);
+            memcpy(buf, &length, LENGTH_SIZE);
+            memcpy(buf + LENGTH_SIZE, &msgType, TYPE_SIZE);
+            memcpy(buf + LENGTH_SIZE + TYPE_SIZE, &retCode, sizeof(int));
             
             break;
-        case EXECUTE_SUCCESS:
+        }
+        case EXECUTE_SUCCESS: {
+            // allocate enough memory for the buffer and update the length of the buffer
+            msgLength = LENGTH_SIZE + TYPE_SIZE + sizeof(int) * oldMsg->argTypesSize + oldMsg->argsLength;
+            buf = new char[msgLength];
+            
+            // create the LOC_FAILURE message
+            int length = sizeof(int);
+            memcpy(buf, &length, LENGTH_SIZE);
+            memcpy(buf + LENGTH_SIZE, &msgType, TYPE_SIZE);
+            
+            buf = buf + LENGTH_SIZE + TYPE_SIZE;
+            
+            // loop to add the argtypes to the message
+            for (int i = 0; i < oldMsg->argTypesSize; i++) {
+                memcpy(buf, &oldMsg->argTypes[i], sizeof(int));
+                buf = buf + sizeof(int);
+            }
+            
+            // loop to add different type of args
+            for (int j = 0; j < oldMsg->argTypesSize - 1; j++) {
+                int arg_type = (oldMsg->argTypes[j] >> (8*2)) & 0xff;
+                int arg_length = (oldMsg->argTypes[j] >> (8*4)) & 0xff;
+                
+                memcpy(buf, oldMsg->args[j], arg_length * arg_type);
+                buf = buf + arg_length * arg_type;
+                
+            }
             
             break;
-        case EXECUTE_FAILURE:
+        }
+        case EXECUTE_FAILURE: {
+            // allocate enough memory for the buffer and update the length of the buffer
+            msgLength = LENGTH_SIZE + TYPE_SIZE + sizeof(int);
+            buf = new char[msgLength];
+            
+            // create the EXECUTE_FAILURE message
+            int length = sizeof(int);
+            memcpy(buf, &length, LENGTH_SIZE);
+            memcpy(buf + LENGTH_SIZE, &msgType, TYPE_SIZE);
+            memcpy(buf + LENGTH_SIZE + TYPE_SIZE, &retCode, sizeof(int));
             
             break;
-    
+        }
         default:
             break;
     }
