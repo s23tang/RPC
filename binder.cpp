@@ -25,7 +25,7 @@ using namespace std;
 
 
 int main(int argc, const char *argv[]) {
-        
+    
     struct Info *info = new Info();
     
     struct sockaddr_storage client; // client address
@@ -132,7 +132,7 @@ int main(int argc, const char *argv[]) {
                                 FD_CLR(i, &master);
                                 clientNum--;
                             } else {
-                            cout << strBuf << endl;
+                                cout << strBuf << endl;
                                 
                                 Message *msg = new Message();
                                 
@@ -158,10 +158,11 @@ int main(int argc, const char *argv[]) {
                                                     
                                                     int sendLength = createMessage(sendBuf, REGISTER_SUCCESS, REGISTER_WARNING, msg);
                                                 }
-
-                                                }
+                                                
                                             }
                                         }
+                                        
+                                        
                                         
                                         // add the new function to the database
                                         struct db_struct* db_entry = new db_struct();
@@ -185,17 +186,18 @@ int main(int argc, const char *argv[]) {
                                     default:
                                         break;
                                 }
-                            
-                            // we got some data from client
-                            for (int j = 0; j <=maxFdNum ; j++) {
-                                // send to everyone
-                                if (FD_ISSET(j, &master)) {
-                                    // except the listener and ourselves
-                                    if (j == i) {
-                                        
-//                                        if (send(j , modifed_str, nbytes, 0) == -1) {
-//                                            cerr << "Server: Send error." << endl;
-//                                        }
+                                
+                                // we got some data from client
+                                for (int j = 0; j <=maxFdNum ; j++) {
+                                    // send to everyone
+                                    if (FD_ISSET(j, &master)) {
+                                        // except the listener and ourselves
+                                        if (j == i) {
+                                            
+                                            //                                        if (send(j , modifed_str, nbytes, 0) == -1) {
+                                            //                                            cerr << "Server: Send error." << endl;
+                                            //                                        }
+                                        }
                                     }
                                 }
                             }
@@ -203,7 +205,6 @@ int main(int argc, const char *argv[]) {
                     }
                 }
             }
-        }
         }
     }
 	return 0;
