@@ -25,7 +25,7 @@ using namespace std;
 
 
 int main(int argc, const char *argv[]) {
-    
+        
     struct Info *info = new Info();
     
     struct sockaddr_storage client; // client address
@@ -55,6 +55,9 @@ int main(int argc, const char *argv[]) {
     int lenBuf;       // buf to recieve message length
     int typeBuf;       // buf to recieve message type
     char *strBuf;     // buf to recieve message string
+    
+    // define the database iterator
+    list<struct db_struct*>::iterator it;
     
     while (true) {
         temp = master;
@@ -133,15 +136,50 @@ int main(int argc, const char *argv[]) {
                                 Message *msg = new Message();
                                 
                                 switch (typeBuf) {
-                                    case REGISTER:
+                                    case REGISTER: {
                                         
+                                        // parse the message we recieved
                                         msg = parseMessage(strBuf, typeBuf, lenBuf);
                                         
+                                        for (it = binder_db.begin(); it != binder_db.end(); it++) {
+                                            if (msg->name == (*it)->name && msg->port == (*it)->port && msg->argTypesSize == (*it)->argTypeSize) {
+                                                bool diff = false;
+                                                for (int i = 0; i < msg->argTypesSize; i++) {
+                                                    if (msg->argTypes[i] != (*it)->argTypes[i]) {
+                                                        diff = true;
+                                                        break;
+                                                    }
+                                                }
+                                                
+                                                if (!diff) {
+                                                    (*it)->address = msg->server_identifier;
+                                                    (*it)->port = msg->port;
+                                                    (*it)->name = msg->name;
+                                                    (*it)->argTypes = new int[msg->argTypesSize];
+                                                    for (int i = 0; i < msg->argTypesSize; i++) {
+                                                        (*it)->argTypes[i] = msg->argTypes[i];
+                                                    }
+
+                                                }
+                                            }
+                                        }
+                                        
+                                        // add the new function to the database
+                                        struct db_struct* db_entry = new db_struct();
+                                        
+                                        db_entry->address = msg->server_identifier;
+                                        db_entry->port = msg->port;
+                                        db_entry->name = msg->name;
+                                        db_entry->argTypes = new int[msg->argTypesSize];
+                                        for (int i = 0; i < msg->argTypesSize; i++) {
+                                            db_entry->argTypes[i] = msg->argTypes[i];
+                                        }
+                                        
+                                        binder_db.push_back(db_entry);
                                         
                                         break;
+                                    }
                                     case LOC_REQUEST:
-                                        break;
-                                    case EXECUTE:
                                         break;
                                     case TERMINATE:
                                         break;

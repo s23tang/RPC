@@ -20,8 +20,9 @@ struct Info {
 struct db_struct {
 	char *name;
 	int  *argTypes;
+    int  argTypeSize;
 	char *address;
-	char *port;
+	unsigned short port;
 };
 
 std::list<db_struct*> binder_db;
