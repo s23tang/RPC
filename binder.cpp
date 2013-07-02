@@ -157,6 +157,10 @@ int main(int argc, const char *argv[]) {
                                                     // with warning of overriding
                                                     
                                                     int sendLength = createMessage(sendBuf, REGISTER_SUCCESS, REGISTER_WARNING, msg);
+                                                    result = (int) send(i, sendBuf, sendLength, 0);
+                                                    if (result < 0) {
+                                                        cerr << "Binder: Send error." << endl;
+                                                    }
                                                 }
                                                 
                                             }
