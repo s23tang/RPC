@@ -53,8 +53,9 @@ int main(int argc, const char *argv[]) {
     int clientNum = 0;
     int nbytes;       // nbytes recived by message
     int lenBuf;       // buf to recieve message length
-    int typeBuf;       // buf to recieve message type
+    int typeBuf;      // buf to recieve message type
     char *strBuf;     // buf to recieve message string
+    char *sendBuf;    // buf to send the whole message
     
     // define the database iterator
     list<struct db_struct*>::iterator it;
@@ -152,13 +153,11 @@ int main(int argc, const char *argv[]) {
                                                 }
                                                 
                                                 if (!diff) {
-                                                    (*it)->address = msg->server_identifier;
-                                                    (*it)->port = msg->port;
-                                                    (*it)->name = msg->name;
-                                                    (*it)->argTypes = new int[msg->argTypesSize];
-                                                    for (int i = 0; i < msg->argTypesSize; i++) {
-                                                        (*it)->argTypes[i] = msg->argTypes[i];
-                                                    }
+                                                    // if same functions from same servers, create success message
+                                                    // with warning of overriding
+                                                    
+                                                    int sendLength = createMessage(sendBuf, REGISTER_SUCCESS, REGISTER_WARNING, msg);
+                                                }
 
                                                 }
                                             }
