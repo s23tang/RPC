@@ -28,6 +28,7 @@
 #define NAME_SIZE			100
 #define PORT_SIZE			2
 #define ARGTYPE_SIZE        4
+#define RCODE_SIZE          4
 
 
 

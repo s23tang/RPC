@@ -10,6 +10,7 @@
 #define __RPC__binder__
 
 #include <list>
+#include <vector>
 
 struct Info {
     char *address;
@@ -25,6 +26,10 @@ struct db_struct {
 	unsigned short port;
 };
 
+// a list used as a function database
 std::list<db_struct*> binder_db;
+
+// a vector to record connected servers
+std::vector<int> servers;
 
 #endif /* defined(__RPC__binder__) */

@@ -66,7 +66,18 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
             }
 
             break;
+        case LOC_SUCCESS:
+            // get the server_identifier
+            msg->server_identifier = new char[strlen(buf) + 1];
+            strcpy(msg->server_identifier, buf);
+            buf = buf + SERVER_ID_SIZE;
+            
+            // get the server's port number
+            memcpy(&msg->port, buf, PORT_SIZE);
+            
+            break;
         case EXECUTE:
+        case EXECUTE_SUCCESS:
             // get the function name
             msg->name = new char[strlen(buf) + 1];
             strcpy(msg->name, buf);
@@ -160,6 +171,13 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
             
             break;
         case TERMINATE:
+            break;
+        case REGISTER_SUCCESS:
+        case REGISTER_FAILURE:
+        case LOC_FAILURE:
+        case EXECUTE_FAILURE:
+            // get the warning/error code
+            memcpy(&msg->reasonCode, buf, RCODE_SIZE);
             break;
         default:
             break;
@@ -267,6 +285,18 @@ int createMessage(char *buf, int msgType, int retCode, struct Message *oldMsg) {
             memcpy(buf, &length, LENGTH_SIZE);
             memcpy(buf + LENGTH_SIZE, &msgType, TYPE_SIZE);
             memcpy(buf + LENGTH_SIZE + TYPE_SIZE, &retCode, sizeof(int));
+            
+            break;
+        }
+        case TERMINATE: {
+            // allocate enough memory for the buffer and update the length of the buffer
+            msgLength = LENGTH_SIZE + TYPE_SIZE;
+            buf = new char[msgLength];
+            
+            // create the TERMINATE message
+            int length = sizeof(int);
+            memcpy(buf, &length, LENGTH_SIZE);
+            memcpy(buf + LENGTH_SIZE, &msgType, TYPE_SIZE);
             
             break;
         }
