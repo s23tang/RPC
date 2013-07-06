@@ -18,4 +18,5 @@
 #define ESEND   -7
 #define ERECV 	-8
 #define ESELECT	-9
+#define ETHREAD -10
 #endif

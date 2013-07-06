@@ -71,22 +71,25 @@ int main(int argc, const char *argv[]) {
         // run through the existing connections to look for datas to read
         for (int i = 0; i <= maxFdNum; i++) {
             if (FD_ISSET(i, &temp)) {
+
                 if (i == listener) {
-                    // handle new connection
-                    addrlen = sizeof client;
-                    new_accept = accept(listener, (struct sockaddr *) &client, &addrlen);
-                    
-                    if (new_accept == -1) {
-                        cerr << "Server: Accept error." << endl;
-                    } else {
+                    if (clientNum < 5) {
+                        // handle new connection
+                        addrlen = sizeof client;
+                        new_accept = accept(listener, (struct sockaddr *) &client, &addrlen);
                         
-                        FD_SET(new_accept, &master);
-                        if (new_accept > maxFdNum) {
-                            maxFdNum = new_accept;
+                        if (new_accept == -1) {
+                            cerr << "Server: Accept error." << endl;
+                        } else {
+                            
+                            FD_SET(new_accept, &master);
+                            if (new_accept > maxFdNum) {
+                                maxFdNum = new_accept;
+                            }
+                            clientNum++;
+                            
+                            cout << "Server: new connection from " << inet_ntop(client.ss_family, get_in_addr((struct sockaddr*) &client), clientIP, INET6_ADDRSTRLEN) << " on socket " << new_accept << endl;
                         }
-                        clientNum++;
-                        
-                        cout << "Server: new connection from " << inet_ntop(client.ss_family, get_in_addr((struct sockaddr*) &client), clientIP, INET6_ADDRSTRLEN) << " on socket " << new_accept << endl;
                     }
                 } else {
                     // handle data from a client
@@ -121,7 +124,7 @@ int main(int argc, const char *argv[]) {
                         } else {
                             strBuf = new char[lenBuf + 1];
                             
-                            if ((nbytes = (int) recv(i, &strBuf, sizeof(strBuf), 0)) <= 0) {
+                            if ((nbytes = (int) recv(i, &strBuf, lenBuf, 0)) <= 0) {
                                 // got invalid message or connection closed by client
                                 if (nbytes == 0) {
                                     // get
@@ -135,7 +138,7 @@ int main(int argc, const char *argv[]) {
                             } else {
                                 cout << strBuf << endl;
                                 
-                                Message *msg = new Message();
+                                Message *msg;
                                 
                                 switch (typeBuf) {
                                     case REGISTER: {

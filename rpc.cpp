@@ -6,6 +6,7 @@
 //  Copyright (c) 2013 Haochen Ding and the mastermind Shisong Tang. All rights reserved.
 //
 #include <iostream>
+#include <list>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -163,21 +164,57 @@ extern int rpcRegister(char* name, int* argTypes, skeleton f) {
 	return ret_val;				// return either the warning or a 0 for success
 }
 
+// the argument contains thread_data structure
+// this function will parse msg and send results to client
+void *ExecFunc(void *threadarg) 
+{
+	thread_data *execArg = (thread_data *)threadarg;	// get the structure containing message and socket id
+	char *unparsedMsg = execArg->message;				// get the raw message
+	int clientSock = execArg->sockfd;					// socket for the client
+
+	// use this to get parsed message;
+	Message *parsedMsg;
+	parsedMsg = parseMessage(unparsedMsg, EXECUTE, execArg->messagelen);
+
+	/*
+				writing this part currently
+	
+	*/
+
+	pthread_exit((void *)threadarg);
+}
+
 extern int rpcExecute() {	// for this function remember to use threads!!!
     fd_set master;                  // master fd list
     fd_set temp;                    // temp fd list
 	int new_accept;                 // newly accepted fd
 	struct sockaddr_storage client; // client address
-	
+	socklen_t addrlen;              // size of ai_addr
+	int result;						// checking valid returns on functions
     
 	int listener = server_info->sockfd;
     char clientIP[INET_ADDRSTRLEN];
     int maxFdNum = listener;
     int clientNum = 0;
+
+    // thread information
+    pthread_attr_t threadInfo;
+    pthread_attr_init(&threadInfo);
+   	pthread_attr_setdetachstate(&threadInfo, PTHREAD_CREATE_JOINABLE);
+   	void *status;
+
+    // received message information
+    int nbytes;						// track total bytes actually received
+    int msglen;						// length of the message received
+    int msgtype;					// type of the message received 
+    char *msgbuf;					// for receiving the message
 	
     FD_SET(listener, &master);
+
+    // add the binder to the master list, to keep it permanently open
+    FD_SET(binder_sock, &master);
+    if (binder_sock > maxFdNum) maxFdNum = binder_sock;
     
-	/* just starting to edit this! copied over from binder.cpp */
 	while (true) {
         temp = master;
         if (select(maxFdNum + 1, &temp, NULL, NULL, NULL) == -1) {
@@ -189,104 +226,113 @@ extern int rpcExecute() {	// for this function remember to use threads!!!
         for (int i = 0; i <= maxFdNum; i++) {
 			if (FD_ISSET(i, &temp)) {
                 if (i == listener) {
-                    // handle new connection
-                    addrlen = sizeof client;
-                    new_accept = accept(listener, (struct sockaddr *) &client, &addrlen);
-                    
-                    if (new_accept == -1) {
-                        cerr << "Server: Accept error." << endl;
-                    } 
-					else {
-                        FD_SET(new_accept, &master);
-                        if (new_accept > maxFdNum) maxFdNum = new_accept;
-                        clientNum++;
-                        
-                        cout << "Server: new connection from " << inet_ntop(client.ss_family, get_in_addr((struct sockaddr*) &client), clientIP, INET6_ADDRSTRLEN) << " on socket " << new_accept << endl;
-                    }
-                } 
-				else {// recieve the length of the message
-                    if ((nbytes = (int) recv(i, &lenBuf, sizeof(int), 0)) <= 0) {
+                	if (clientNum < 5) {
+	                	// handle new connection
+	                    addrlen = sizeof client;
+	                    new_accept = accept(listener, (struct sockaddr *) &client, &addrlen);
+	                    
+	                    if (new_accept == -1) {
+	                        cerr << "Server: (" << server_info->address << ") Accept error." << endl;
+	                    } 
+						else {
+	                        FD_SET(new_accept, &master);
+	                        if (new_accept > maxFdNum) maxFdNum = new_accept;
+	                        clientNum++;
+	                        
+	                        cout << "Server: (" << server_info->address << ") new connection from " << inet_ntop(client.ss_family, get_in_addr((struct sockaddr*) &client), clientIP, INET6_ADDRSTRLEN) << " on socket " << new_accept << endl;
+	                    }	
+                	}
+                }
+				else {// receive the length of the message
+
+					if ((nbytes = (int) recv(i, &msglen, sizeof(int), 0)) <= 0) {
                         // got error or connection closed by client
                         if (nbytes == 0) {
                             // connection closed
-                            cout << "Server: socket " << i << " hung up." << endl;
-                        } 
-						else cerr << "Server: Recieve error." << endl;
-						
+                            cout << "Server: (" << server_info->address << ") socket " << i << " has closed." << endl;
+                        } else {
+                            cerr << "Server: (" << server_info->address << ") Recieve error." << endl;
+                        }
                         close(i);
                         FD_CLR(i, &master);
                         clientNum--;
-                    } else {
-                        // recieve the type of the message
-                        
-                        if ((nbytes = (int) recv(i, &typeBuf, sizeof(int), 0)) <= 0) {
+                    }
+                    else {// got a message
+
+                    	if ((nbytes = (int) recv(i, &msgtype, sizeof(int), 0)) <= 0) {
                             // got invalid message or connection closed by client
                             if (nbytes == 0) {
-                                // get
-                                cout << "Server: socket " << i << " hung up." << endl;
+                                // connection closed
+                                cout << "Server: (" << server_info->address << ") socket " << i << " has closed." << endl;
                             } else {
-                                cerr << "Server: Recieve error." << endl;
+                                cerr << "Server: (" << server_info->address << ") Recieve error." << endl;
                             }
                             close(i);
                             FD_CLR(i, &master);
                             clientNum--;
-                        } else {
-                            strBuf = new char[lenBuf + 1];
-                            
-                            if ((nbytes = (int) recv(i, &strBuf, sizeof(strBuf), 0)) <= 0) {
+                        }
+                        else {
+                        	if (msgtype == TERMINATE && i==binder_sock) {
+                        		goto terminated;
+                        	}
+
+                  			msgbuf = new char[msglen]; // there is a +1 in binder.cpp figure that out after
+
+                        	if ((nbytes = (int) recv(i, &msgbuf, msglen, 0)) <= 0) {
                                 // got invalid message or connection closed by client
                                 if (nbytes == 0) {
-                                    // get
-                                    cout << "Server: socket " << i << " hung up." << endl;
-                                } else {
-                                    cerr << "Server: Recieve error." << endl;
-                                }
+                                	// connection closed
+	                                cout << "Server: (" << server_info->address << ") socket " << i << " has closed." << endl;
+	                            } else {
+	                                cerr << "Server: (" << server_info->address << ") Recieve error." << endl;
+	                            }
                                 close(i);
                                 FD_CLR(i, &master);
                                 clientNum--;
-                            } else {
-                            cout << strBuf << endl;
-                                
-                                Message *msg = new Message();
-                                
-                                switch (typeBuf) {
-                                    case REGISTER:
-                                        
-                                        msg = parseMessage(strBuf, typeBuf);
-                                        
-                                        
-                                        break;
-                                    case LOC_REQUEST:
-                                        break;
-                                    case EXECUTE:
-                                        break;
-                                    case TERMINATE:
-                                        break;
-                                    default:
-                                        break;
-                                }
-                            
-                            // we got some data from client
-                            for (int j = 0; j <=maxFdNum ; j++) {
-                                // send to everyone
-                                if (FD_ISSET(j, &master)) {
-                                    // except the listener and ourselves
-                                    if (j == i) {
-                                        
-//                                        if (send(j , modifed_str, nbytes, 0) == -1) {
-//                                            cerr << "Server: Send error." << endl;
-//                                        }
-                                    }
-                                }
                             }
-                        }
-                    }
-                }
-            }
-        }
-		}/*for*/
-	}/*while*/
-}
+                            else {
+                            	if (msgtype != EXECUTE) {
+	                        		cerr << "Server: (" << server_info->address << ") only receives type EXECUTE messages" << endl;
+	                        		delete [] msgbuf;
+	                        		continue;
+	                        	}
+	                        	// if too many threads leads to corruption, can set check on vec_count < N
+	                        	// where N is the max number of concurrent threads running
+
+	                        	threadList.push_back(new pthread_t);
+	                        	thread_data *execData = new thread_data;
+	                        	execData->message = msgbuf;
+	                        	execData->messagelen = msglen;
+	                        	execData->sockfd = i;
+
+	                        	result = pthread_create(threadList.back(), &threadInfo, ExecFunc, (void *)execData);
+	                        	if (result) {
+	                        		cerr << "Server: (" << server_info->address << ") ERROR in thread creation" << endl;
+	                        		return ETHREAD;
+	                        	}
+
+                            }/* send to parse */
+                        }/* process msg */
+                    }/* else message */
+            	}/* else receive */
+        	}/* if FD_ISSET */
+		}/* for */
+	}/* while */
+
+terminated:
+	// wait till all threads join
+	pthread_attr_destroy(&threadInfo);
+	for (list<pthread_t*>::iterator it=threadList.begin(); it!=threadList.end(); it++) {
+		pthread_join(**it, &status);
+	}
+
+	//close all the sockets in use
+	// free up unecessary shit
+	// when done thread exit
+
+	pthread_exit(NULL);
+
+}/* rpcExecute */
 
 extern int rpcTerminate() {
 	// remember to free local database and server_info
