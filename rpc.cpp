@@ -79,7 +79,10 @@ extern int rpcInit()
 }
 
 extern int rpcCall(char* name, int* argTypes, void** args) {
+	/*
+		on this now
 
+	*/
 }
 
 extern int rpcCacheCall(char* name, int* argTypes, void** args) {
@@ -95,7 +98,8 @@ extern int rpcRegister(char* name, int* argTypes, skeleton f) {
 	int ret_val;				// warnings or errors returned
 	
     for (argType_size=0; argTypes[argType_size]!=0; argType_size++);
-	argType_size = 4*(argType_size+1);			// 4 bytes per element counting 0 at the end
+    argType_size++;
+	argType_size = 4*(argType_size);			// 4 bytes per element counting 0 at the end
 	
 	length = SERVER_ID_SIZE + PORT_SIZE + NAME_SIZE + argType_size;
 	
@@ -148,13 +152,32 @@ extern int rpcRegister(char* name, int* argTypes, skeleton f) {
 		if (server_entry->name == (*it)->name) {
 			int i;
 			for (i=0; (*it)->argTypes[i] != 0; i++);
-			if (argType_size/4 == ++i) {	// if same size of argument types then replace with latest
-				delete [] (*it)->name;
-				delete [] (*it)->argTypes;
-				delete [] (*it);
-				*it = server_entry;
-				replaced = 1;
-				break;
+			if (argType_size/4 == ++i) {	// if same size of argument types then check if arguments same
+				int j;
+				for (j=0; (*it)->argTypes[j] != 0; j++) {
+					// check that the input output bits are the same, and same type
+					int s_pre_arg = (int)(*it)->argTypes[j] & 0xffff0000;
+					int c_pre_arg = (int)server_entry->argTypes[j] & 0xffff0000;
+
+					if (s_pre_arg != c_pre_arg) break;
+
+					// check that they are both scalar or both arrays
+					int server_arg_len = (int)(*it)->argTypes[j] & 0xffff;
+					int curr_arg_len = (int)server_entry->argTypes[j] & 0xffff;
+
+					if (!(((server_arg_len > 0) && (curr_arg_len > 0)) || ((server_arg_len == 0) && (curr_arg_len == 0)))) break;
+
+					// both inout are same, type is the same, and they or both scalar or both arrays
+					// then check the next argument type
+				}
+				if (++j == i) {
+					delete [] (*it)->name;
+					delete [] (*it)->argTypes;
+					delete [] (*it);
+					*it = server_entry;
+					replaced = 1;
+					break;
+				}
 			}
 		}
 	}
@@ -176,10 +199,66 @@ void *ExecFunc(void *threadarg)
 	Message *parsedMsg;
 	parsedMsg = parseMessage(unparsedMsg, EXECUTE, execArg->messagelen);
 
-	/*
-				writing this part currently
-	
-	*/
+	// search and find the function on the server database
+	skeleton to_run;
+	for (list<server_func*>::iterator it=server_db.begin(); it != server_db.end(); it++){
+		if (parsedMsg->name == (*it)->name) {
+			int i;
+			for (i=0; (*it)->argTypes[i] != 0; i++);
+			if (parsedMsg->argTypesSize == ++i) {	// if same size of argument types then check if arguments same
+				int j;
+				for (j=0; (*it)->argTypes[j] != 0; j++) {
+					// check that the input output bits are the same, and same type
+					int s_pre_arg = (int)(*it)->argTypes[j] & 0xffff0000;
+					int c_pre_arg = (int)parsedMsg->argTypes[j] & 0xffff0000;
+
+					if (s_pre_arg != c_pre_arg) break;
+
+					// check that they are both scalar or both arrays
+					int server_arg_len = (int)(*it)->argTypes[j] & 0xffff;
+					int curr_arg_len = (int)parsedMsg->argTypes[j] & 0xffff;
+
+					if (!(((server_arg_len > 0) && (curr_arg_len > 0)) || ((server_arg_len == 0) && (curr_arg_len == 0)))) break;
+
+					// both inout are same, type is the same, and they or both scalar or both arrays
+					// then check the next argument type
+				}
+				// if function is found, time to execute it
+				if (++j == i) {
+					to_run = (*it)->func;
+					goto run;
+				}
+			}
+		}
+	}
+
+run:
+	int result = *to_run(parsedMsg->argTypes, parsedMsg->args);
+
+	char *sendMsg;				// msg to send to client
+	int sendMsg_len;			// length of message to send in bytes
+	if (result < 0) {
+		// error send EXECUTE_FAILURE to client
+		sendMsg_len = createMessage(sendMsg, EXECUTE_FAILURE, result, NULL);
+	}
+	else {
+		// success send results back to client
+		sendMsg_len = createMessage(sendMsg, EXECUTE_SUCCESS, result, parsedMsg);
+	}
+
+	if (send(execArg->sockfd, sendMsg, sendMsg_len, 0) == -1) {
+		cerr << "ERROR: could not send results from function (" << parsedMsg->name << ") back to client" << endl;
+	}
+
+	// delete parsedMsg and sendmsg
+	delete [] sendMsg;
+	delete [] parsedMsg->server_identifier;
+	delete [] parsedMsg->argTypes;
+	delete [] parsedMsg->name;
+	for (int k=0; k < parsedMsg->argTypesSize-1; k++) {
+		delete [] parsedMsg->args[k];
+	}
+	delete [] parsedMsg->args;
 
 	pthread_exit((void *)threadarg);
 }

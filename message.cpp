@@ -88,7 +88,7 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
             num_argTypes = 0;
             while (true) {
                 int temp;
-                memcpy(&temp, buf, ARGTYPE_SIZE);
+                memcpy(&temp, buf + ARGTYPE_SIZE*num_argTypes, ARGTYPE_SIZE);
                 
                 if (temp == 0) {
                     num_argTypes++;
@@ -100,24 +100,21 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
             
             msg->argTypesSize = num_argTypes;
             
-            msg->argTypes = new int[num_argTypes - 1];
+            msg->argTypes = new int[num_argTypes];
             
-            // loop to add argTypes
-            for (int i = 0; i < num_argTypes; i++) {
-                memcpy(&msg->argTypes[i], buf, ARGTYPE_SIZE);
-                buf = buf + ARGTYPE_SIZE;
-            }
+            // add argTypes
+            memcpy(msg->argTypes, buf, ARGTYPE_SIZE*num_argTypes);
             
             // used to update the total length of the args
             msg->argsLength = 0;
             // loop to add different type of args
             for (int j = 0; j < num_argTypes - 1; j++) {
                 int arg_type = (msg->argTypes[j] >> (8*2)) & 0xff;
-                int arg_length = (msg->argTypes[j] >> (8*4)) & 0xff;
+                int arg_length = msg->argTypes[j] & 0xffff;
                 
                 switch (arg_type) {
                     case ARG_CHAR: {
-                        char *curArgs = new char[arg_length + 1];
+                        char *curArgs = new char[arg_length];
                         memcpy(curArgs, buf, arg_length);
                         msg->args[j] = (void *)curArgs;
                         buf = buf + arg_length;
@@ -247,16 +244,19 @@ int createMessage(char *buf, int msgType, int retCode, struct Message *oldMsg) {
         }
         case EXECUTE_SUCCESS: {
             // allocate enough memory for the buffer and update the length of the buffer
-            msgLength = LENGTH_SIZE + TYPE_SIZE + sizeof(int) * oldMsg->argTypesSize + oldMsg->argsLength;
+            msgLength = LENGTH_SIZE + TYPE_SIZE + NAME_SIZE + ARGTYPE_SIZE * oldMsg->argTypesSize + oldMsg->argsLength;
             buf = new char[msgLength];
             
-            // create the LOC_FAILURE message
-            int length = sizeof(int);
+            // create the EXECUTE_SUCCESS message
+            int length = NAME_SIZE + ARGTYPE_SIZE * oldMsg->argTypesSize + oldMsg->argsLength;
             memcpy(buf, &length, LENGTH_SIZE);
             memcpy(buf + LENGTH_SIZE, &msgType, TYPE_SIZE);
             
             buf = buf + LENGTH_SIZE + TYPE_SIZE;
             
+            strcpy(buf, oldMsg->name);
+            buf = buf + NAME_SIZE;
+
             // loop to add the argtypes to the message
             for (int i = 0; i < oldMsg->argTypesSize; i++) {
                 memcpy(buf, &oldMsg->argTypes[i], sizeof(int));
@@ -266,10 +266,30 @@ int createMessage(char *buf, int msgType, int retCode, struct Message *oldMsg) {
             // loop to add different type of args
             for (int j = 0; j < oldMsg->argTypesSize - 1; j++) {
                 int arg_type = (oldMsg->argTypes[j] >> (8*2)) & 0xff;
-                int arg_length = (oldMsg->argTypes[j] >> (8*4)) & 0xff;
+                int arg_length = oldMsg->argTypes[j] & 0xffff;
                 
-                memcpy(buf, oldMsg->args[j], arg_length * arg_type);
-                buf = buf + arg_length * arg_type;
+                int size_of_type;
+                if (arg_type == ARG_CHAR) {
+                    size_of_type = sizeof(char);
+                }
+                else if (arg_type == ARG_SHORT) {
+                    size_of_type = sizeof(short);
+                }
+                else if (arg_type == ARG_INT) {
+                    size_of_type = sizeof(int);
+                }
+                else if (arg_type == ARG_LONG) {
+                    size_of_type = sizeof(long);
+                }
+                else if (arg_type == ARG_DOUBLE) {
+                    size_of_type = sizeof(double);
+                }
+                else if (arg_type == ARG_FLOAT) {
+                    size_of_type = sizeof(float);
+                }
+
+                memcpy(buf, oldMsg->args[j], arg_length * size_of_type);
+                buf = buf + arg_length * size_of_type;
                 
             }
             
