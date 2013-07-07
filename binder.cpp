@@ -36,6 +36,8 @@ int main(int argc, const char *argv[]) {
     fd_set master;                  // master fd list
     fd_set temp;                    // temp fd list
     
+    int terminate;                  // terminate flag
+    
     // initialize the binder and set the listener
     result = Init(info);
 	if (result < 0) exit(result);
@@ -57,11 +59,16 @@ int main(int argc, const char *argv[]) {
     char *strBuf;     // buf to recieve message string
     char *sendBuf;    // buf to send the whole message
     
+    terminate = 0;
+    
     // define the database iterator
     list<struct db_struct*>::iterator it;
     vector<int>::iterator server_it;
     
     while (true) {
+        
+        if (terminate == 1) break;
+        
         temp = master;
         if (select(maxFdNum + 1, &temp, NULL, NULL, NULL) == -1) {
             cerr << "Server: Select error." << endl;
@@ -122,6 +129,26 @@ int main(int argc, const char *argv[]) {
                             FD_CLR(i, &master);
                             clientNum--;
                         } else {
+                            
+                        if (typeBuf == TERMINATE) {
+                            
+                            if (servers.size() != 0) {
+                                for (server_it = servers.begin(); server_it != servers.end(); server_it++) {
+                                    int sendLength = createMessage(sendBuf, TERMINATE, 0, NULL);
+                                    result = (int) send(*server_it, sendBuf, sendLength, 0);
+                                    if (result < 0) {
+                                        cerr << "Binder: Send error, TERMINATE" << endl;
+                                    }
+                                    
+                                    close(*server_it);
+                                }
+                            }
+                            
+                            terminate = 1;
+                            
+                            break;
+                        } else {
+
                             strBuf = new char[lenBuf + 1];
                             
                             if ((nbytes = (int) recv(i, &strBuf, lenBuf, 0)) <= 0) {
@@ -271,26 +298,10 @@ int main(int argc, const char *argv[]) {
                                         
                                         break;
                                     }
-                                    case TERMINATE: {
-                                        
-                                        if (servers.size() != 0) {
-                                            for (server_it = servers.begin(); server_it != servers.end(); server_it++) {
-                                                int sendLength = createMessage(sendBuf, TERMINATE, 0, NULL);
-                                                result = (int) send(*server_it, sendBuf, sendLength, 0);
-                                                if (result < 0) {
-                                                    cerr << "Binder: Send error, TERMINATE" << endl;
-                                                }
-                                                
-                                                close(*server_it);
-                                            }
-                                        }
-                                        
-                                        break;
-                                    }
                                     default:
                                         break;
                                 }
-                                
+                            }
                             }
                         }
                     }
