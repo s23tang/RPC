@@ -155,7 +155,7 @@ extern int rpcCall(char* name, int* argTypes, void** args) {
 
     char *msgbuf = new char[loc_replyLen];
 
-    if ((nbytes = (int) recv(i, msgbuf, loc_replyLen, 0)) <= 0) {
+    if ((nbytes = (int) recv(client_binder_sock, msgbuf, loc_replyLen, 0)) <= 0) {
     	delete [] msgbuf;
 		close(client_binder_sock);
 		return ERECV;
@@ -270,17 +270,58 @@ extern int rpcCall(char* name, int* argTypes, void** args) {
 
 		// finished packing the execute message, time to send
 		if (send(server_sock, execReq, execLen, 0) == -1) {
-			cerr << "ERROR: could not send execute message from function (" << name << ") to server" << endl;
+			cerr << "ERROR: could not send execute message from function (" << name << ") to server " << server_host_name << endl;
 			return ESEND;
 		}
 
-		/*
-
-			writing this part, gonna receive reply form server, then set as necessary
-
-		*/
-
-    }
+		// sent execute message to server, time to parse received results
+        
+        // nbytes is the total of bytes received
+        int exec_replyLen;                          // length of execute request reply msg
+        int exec_replyType;                         // type of the execute request reply
+        
+        if ((nbytes = (int) recv(server_sock, &exec_replyLen, sizeof(int), 0)) <= 0) {
+            close(server_sock);
+            return ERECV;
+        }
+        
+        if ((nbytes = (int) recv(server_sock, &exec_replyType, sizeof(int), 0)) <= 0) {
+            close(server_sock);
+            return ERECV;
+        }
+        
+        char *msgbuf2 = new char[exec_replyLen];
+        
+        if ((nbytes = (int) recv(server_sock, msgbuf2, exec_replyLen, 0)) <= 0) {
+            delete [] msgbuf2;
+            close(server_sock);
+            return ERECV;
+        }
+        
+        Message *exec_reply;
+        
+        if (exec_replyType == EXECUTE_FAILURE) {
+            parseMessage(exec_reply, EXECUTE_FAILURE, exec_replyLen);
+            int errcode = exec_reply->reasonCode;
+            
+            delete exec_reply;
+            delete [] msgbuf2;
+            close(server_sock);
+            
+            return errcode;
+        }
+        else if (exec_replyType == EXECUTE_SUCCESS) {
+            parseMessage(exec_reply, EXECUTE_SUCCESS, exec_replyLen);
+            
+            for (int argcounter=0; exec_reply->argTypes[argcounter]!=0; argcounter++) {
+                argTypes[argcounter] = exec_reply->argTypes[argcounter];
+                args[argcounter] = exec_reply->args[argcounter];
+            }
+            
+        }/*else if EXECUTE_SUCCESS*/
+    }/*else if LOC_SUCCESS*/
+    
+    return 0;
 }
 
 extern int rpcCacheCall(char* name, int* argTypes, void** args) {
@@ -604,7 +645,7 @@ terminated:
 	}
 
 	//close all the sockets in use
-	// free up unecessary shit
+	// free up unecessary shit, free up dat database
 	// when done thread exit
 
 	pthread_exit(NULL);
@@ -612,5 +653,51 @@ terminated:
 }/* rpcExecute */
 
 extern int rpcTerminate() {
-	// remember to free local database and server_info
+	// open connection to binder
+	char *host_name;						// binder address 
+	char *port_num;							// binder port
+	struct addrinfo hints, *res, *counter;	// addrinfo for specifying and getting info and a counter
+	int client_binder_sock;					// socket for connection with binder
+	int result;								// check returns
+	
+	// get server address and port from environment variable
+	host_name = getenv("BINDER_ADDRESS");
+	port_num = getenv("BINDER_PORT");
+	
+	// specify to use TCP instead of datagram
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_PASSIVE;
+	
+	if (getaddrinfo(host_name, port_num, &hints, &res) != 0) return EGADDR;
+	
+	// go along the linked list for a valid entry
+	for(counter = res; counter != NULL; counter = counter->ai_next) {
+		client_binder_sock = socket(counter->ai_family, counter->ai_socktype, counter->ai_protocol);
+		if (client_binder_sock == -1) continue;	// has not found a socket descriptor
+		
+		result = connect(client_binder_sock, counter->ai_addr, counter->ai_addrlen);
+		if (result == -1) continue; // cannot connect to socket
+		
+		break;						// found good socket descriptor
+	}
+	if (counter == NULL) return ESOCK;
+    
+	freeaddrinfo(res);
+    
+    //form the terminate message
+    char *msgbuf;
+    int msgbufLen;
+    
+    msgbufLen = createMessage(msgbuf, TERMINATE, 0, NULL);
+    
+    if (send(client_binder_sock, msgbuf, msgbufLen, 0) == -1) {
+		cerr << "ERROR: could not send terminate message to binder" << endl;
+        delete [] msgbuf;
+		return ESEND;
+	}
+    
+    delete [] msgbuf;
+    return 0;
 }
