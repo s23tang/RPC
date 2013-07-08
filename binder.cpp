@@ -151,7 +151,7 @@ int main(int argc, const char *argv[]) {
 
                             strBuf = new char[lenBuf + 1];
                             
-                            if ((nbytes = (int) recv(i, &strBuf, lenBuf, 0)) <= 0) {
+                            if ((nbytes = (int) recv(i, strBuf, lenBuf, 0)) <= 0) {
                                 // got invalid message or connection closed by client
                                 if (nbytes == 0) {
                                     // get

@@ -288,9 +288,15 @@ int createMessage(char *buf, int msgType, int retCode, struct Message *oldMsg) {
                     size_of_type = sizeof(float);
                 }
 
-                memcpy(buf, oldMsg->args[j], arg_length * size_of_type);
-                buf = buf + arg_length * size_of_type;
-                
+                // check if scalar or array
+                if (arg_length == 0) {
+                    memcpy(buf, oldMsg->args[j], size_of_type);
+                    buf = buf + size_of_type;
+                }
+                else {
+                    memcpy(buf, oldMsg->args[j], arg_length * size_of_type);
+                    buf = buf + arg_length * size_of_type;
+                }  
             }
             
             break;

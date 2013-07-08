@@ -45,8 +45,8 @@ extern int rpcInit()
 	/* done creating socket for acceting connections from clients */
 	
 	// open connection to binder
-	char *host_name;						// server address 
-	char *port_num;							// server port
+	char *host_name;						// binder address 
+	char *port_num;							// binder port
 	struct addrinfo hints, *res, *counter;	// addrinfo for specifying and getting info and a counter
 	
 	// get server address and port from environment variable
@@ -79,10 +79,208 @@ extern int rpcInit()
 }
 
 extern int rpcCall(char* name, int* argTypes, void** args) {
-	/*
-		on this now
+	// open connection to binder
+	char *host_name;						// binder address 
+	char *port_num;							// binder port
+	struct addrinfo hints, *res, *counter;	// addrinfo for specifying and getting info and a counter
+	int client_binder_sock;					// socket for connection with binder
+	int result;								// check returns
+	
+	// get server address and port from environment variable
+	host_name = getenv("BINDER_ADDRESS");
+	port_num = getenv("BINDER_PORT");
+	
+	// specify to use TCP instead of datagram
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_PASSIVE;
+	
+	if (getaddrinfo(host_name, port_num, &hints, &res) != 0) return EGADDR;
+	
+	// go along the linked list for a valid entry
+	for(counter = res; counter != NULL; counter = counter->ai_next) {
+		client_binder_sock = socket(counter->ai_family, counter->ai_socktype, counter->ai_protocol);
+		if (client_binder_sock == -1) continue;	// has not found a socket descriptor
+		
+		result = connect(client_binder_sock, counter->ai_addr, counter->ai_addrlen);
+		if (result == -1) continue; // cannot connect to socket
+		
+		break;						// found good socket descriptor
+	}
+	if (counter == NULL) return ESOCK;
 
-	*/
+	freeaddrinfo(res);
+
+	// form the location request message
+	char *locReq;					// request buffer to send the request message
+	int requestLen;					// total size of the buffer
+	int msglen;						// size of the "message" portion
+	int argType_size=0;				// counter for argTypes size
+
+	for (int i=0; argTypes[i] != 0; i++) argType_size++;
+	argTypesSize++;
+	
+	requestLen = LENGTH_SIZE + TYPE_SIZE + NAME_SIZE + ARGTYPE_SIZE * argType_size;
+	msglen = NAME_SIZE + ARGTYPE_SIZE * argType_size;
+
+	locReq = new char [requestLen];
+
+	// place the information into the request buffer
+	memcpy(locReq, &msglen, LENGTH_SIZE);
+	memcpy(locReq+LENGTH_SIZE, LOC_REQUEST, TYPE_SIZE);
+	strcpy(locReq+LENGTH_SIZE+TYPE_SIZE, name, NAME_SIZE);
+	memcpy(locReq+LENGTH_SIZE+TYPE_SIZE+NAME_SIZE, argTypes, ARGTYPE_SIZE * argType_size);
+
+	if (send(client_binder_sock, locReq, requestLen, 0) == -1) {
+		cerr << "ERROR: could not send location request from function (" << name << ") to binder" << endl;
+		return ESEND;
+	}
+
+	// sent location request to binder, time to parse received results
+
+	int nbytes;						// track total bytes actually received
+	int loc_replyLen;				// length of location request reply msg
+	int loc_replyType;				// type of the location request reply
+
+	if ((nbytes = (int) recv(client_binder_sock, &loc_replyLen, sizeof(int), 0)) <= 0) {
+		close(client_binder_sock);
+		return ERECV;
+	}
+    
+    if ((nbytes = (int) recv(client_binder_sock, &loc_replyType, sizeof(int), 0)) <= 0) {
+		close(client_binder_sock);
+		return ERECV;
+	}
+
+    char *msgbuf = new char[loc_replyLen];
+
+    if ((nbytes = (int) recv(i, msgbuf, loc_replyLen, 0)) <= 0) {
+    	delete [] msgbuf;
+		close(client_binder_sock);
+		return ERECV;
+	}
+
+	Message *loc_reply;
+
+    if (loc_replyType == LOC_FAILURE) {
+    	parseMessage(loc_reply, LOC_FAILURE, loc_replyLen);
+    	int errcode = loc_reply->reasonCode;
+
+    	delete loc_reply;
+    	delete [] msgbuf;
+		close(client_binder_sock);
+		
+		return errcode;
+    }
+    else if (loc_replyType == LOC_SUCCESS) {
+    	parseMessage(loc_reply, LOC_SUCCESS, loc_replyLen);
+
+    	// open connection to requested server
+		char *server_host_name;											// binder address 
+		char *server_port_num;											// binder port
+		struct addrinfo server_hints, *server_res, *server_counter;		// addrinfo for specifying and getting info and a counter
+		int server_sock;												// socket for server
+		
+		// get server address and port from environment variable
+		server_host_name = loc_reply->server_identifier;
+		server_port_num = loc_reply->port;
+		
+		// specify to use TCP instead of datagram
+		memset(&server_hints, 0, sizeof server_hints);
+		server_hints.ai_family = AF_INET;
+		server_hints.ai_socktype = SOCK_STREAM;
+		server_hints.ai_flags = AI_PASSIVE;
+		
+		if (getaddrinfo(server_host_name, server_port_num, &server_hints, &server_res) != 0) return EGADDR;
+		
+		// go along the linked list for a valid entry
+		for(server_counter = server_res; server_counter != NULL; server_counter = server_counter->ai_next) {
+			server_sock = socket(server_counter->ai_family, server_counter->ai_socktype, server_counter->ai_protocol);
+			if (server_sock == -1) continue;	// has not found a socket descriptor
+			
+			result = connect(server_sock, server_counter->ai_addr, server_counter->ai_addrlen);
+			if (result == -1) continue; // cannot connect to socket
+			
+			break;						// found good socket descriptor
+		}
+		if (server_counter == NULL) return ESOCK;
+		
+		freeaddrinfo(server_res);
+
+		// form the execute message
+		char *execReq;					// execute buffer to send the execute message
+		int execLen;					// total size of the buffer
+		int *argLen_arr;				// array to track each arg length
+		
+		argLen_arr = new int[argType_size-1];
+
+		execLen = LENGTH_SIZE + TYPE_SIZE + NAME_SIZE + ARGTYPE_SIZE * argType_size;
+
+		for (int i = 0; i < argType_size - 1; i++) {
+            int arg_type = (argTypes[i] >> (8*2)) & 0xff;
+            int arg_length = argTypes[i] & 0xffff;
+            
+            int size_of_type;
+            if (arg_type == ARG_CHAR) {
+                size_of_type = sizeof(char);
+            }
+            else if (arg_type == ARG_SHORT) {
+                size_of_type = sizeof(short);
+            }
+            else if (arg_type == ARG_INT) {
+                size_of_type = sizeof(int);
+            }
+            else if (arg_type == ARG_LONG) {
+                size_of_type = sizeof(long);
+            }
+            else if (arg_type == ARG_DOUBLE) {
+                size_of_type = sizeof(double);
+            }
+            else if (arg_type == ARG_FLOAT) {
+                size_of_type = sizeof(float);
+            }
+
+            if (arg_length == 0) {
+            	argLen_arr[i] = size_of_type;
+            	execLen = execLen + size_of_type;
+            }
+            else {
+            	argLen_arr[i] = size_of_type * arg_length;
+            	execLen = execLen + size_of_type * arg_length;
+            }
+        }
+
+        execReq = new char[execLen];
+
+		msglen = execLen - LENGTH_SIZE - TYPE_SIZE;
+
+		// place the information into the execute message buffer
+		memcpy(execReq, &msglen, LENGTH_SIZE);
+		memcpy(execReq+LENGTH_SIZE, EXECUTE, TYPE_SIZE);
+		strcpy(execReq+LENGTH_SIZE+TYPE_SIZE, name, NAME_SIZE);
+		memcpy(execReq+LENGTH_SIZE+TYPE_SIZE+NAME_SIZE, argTypes, ARGTYPE_SIZE * argType_size);
+
+		char *temp = execReq + LENGTH_SIZE + TYPE_SIZE + NAME_SIZE + ARGTYPE_SIZE * argType_size;			// temp iterator
+
+		for (int j=0; j < argType_size-1; j++) {
+			memcpy(temp, args[j], argLen_arr[j]);
+			temp = temp + argLen_arr[j];
+		}
+
+		// finished packing the execute message, time to send
+		if (send(server_sock, execReq, execLen, 0) == -1) {
+			cerr << "ERROR: could not send execute message from function (" << name << ") to server" << endl;
+			return ESEND;
+		}
+
+		/*
+
+			writing this part, gonna receive reply form server, then set as necessary
+
+		*/
+
+    }
 }
 
 extern int rpcCacheCall(char* name, int* argTypes, void** args) {
@@ -357,7 +555,7 @@ extern int rpcExecute() {	// for this function remember to use threads!!!
 
                   			msgbuf = new char[msglen]; // there is a +1 in binder.cpp figure that out after
 
-                        	if ((nbytes = (int) recv(i, &msgbuf, msglen, 0)) <= 0) {
+                        	if ((nbytes = (int) recv(i, msgbuf, msglen, 0)) <= 0) {
                                 // got invalid message or connection closed by client
                                 if (nbytes == 0) {
                                 	// connection closed
