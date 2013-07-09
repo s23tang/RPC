@@ -19,7 +19,6 @@
 #include <pthread.h>
 
 #include "error.h"
-#include "binder.h"
 #include "initialization.h"
 #include "message.h"
 #include "rpc.h"
@@ -33,7 +32,7 @@ extern int rpcInit()
 	server_info = new Info();
     int result;                     // return value
     
-    result = Init(server_info);
+    result = Init(&server_info);
 	if (result < 0) return result;
 	
 	/* done creating socket for acceting connections from clients */

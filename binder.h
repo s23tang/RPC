@@ -12,12 +12,6 @@
 #include <list>
 #include <vector>
 
-struct Info {
-    char *address;
-    char *port;
-    int sockfd;
-};
-
 struct db_struct {
 	char *name;
 	int  *argTypes;

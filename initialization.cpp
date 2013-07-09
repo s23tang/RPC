@@ -11,7 +11,6 @@
 #include <sstream>
 #include <pthread.h>
 
-#include "binder.h"
 #include "initialization.h"
 #include "error.h"
 
@@ -23,11 +22,11 @@ using std::endl;
 using std::string;
 using std::string;
 
-int Init(struct Info *info) {
+int Init(struct Info **info) {
     char hostName[128];
 
-    struct sockaddr_in saddr, taddr;			// for packing server and a placeholder
-	int sockfd;						// socket file descriptor for listening, and placeholder
+    struct sockaddr_in saddr, taddr;		// for packing server and a placeholder
+	int sockfd;                             // socket file descriptor for listening, and placeholder
 	int result;								// for checking return values
     
     /* get the host name of the binder machine */
@@ -38,7 +37,10 @@ int Init(struct Info *info) {
         return(EHOST);
     }
     
-    info->address = hostName;
+    char *actName = new char[128];
+    strcpy(actName, hostName);
+    
+    (*info)->address = actName;
     
     /* get the socket fd and the free port */
 	
@@ -63,7 +65,7 @@ int Init(struct Info *info) {
         return(ELISTEN);
     }
     
-    info->sockfd = sockfd;
+    (*info)->sockfd = sockfd;
 	
 	socklen_t len = sizeof(taddr);
 	result = getsockname(sockfd, (struct sockaddr *)&taddr, &len);
@@ -76,7 +78,10 @@ int Init(struct Info *info) {
     
     sprintf(portstring, "%hu", ntohs(taddr.sin_port));
 	
-	info->port = portstring;
+    char *actPort = new char[2];
+    strcpy(actPort, portstring);
+    
+	(*info)->port = actPort;
 	
 	return 0;
 }

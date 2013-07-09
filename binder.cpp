@@ -39,9 +39,9 @@ int main(int argc, const char *argv[]) {
     int terminate;                  // terminate flag
     
     // initialize the binder and set the listener
-    result = Init(info);
+    result = Init(&info);
 	if (result < 0) exit(result);
-	
+    
     int listener = info->sockfd;
     
     // print the binder infomation

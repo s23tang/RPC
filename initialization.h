@@ -9,7 +9,13 @@
 #ifndef __RPC__initialization__
 #define __RPC__initialization__
 
-int Init(struct Info *info);
+struct Info {
+    char *address;
+    char *port;
+    int sockfd;
+};
+
+int Init(struct Info **info);
 void *get_in_addr(struct sockaddr *sa);
 
 #endif /* defined(__RPC__initialization__) */
