@@ -31,13 +31,7 @@ extern int rpcInit()
 {
 	// set up socket for listening
 	server_info = new Info();
-    struct sockaddr_storage client; // client address
-    int new_accept;                 // newly accepted fd
     int result;                     // return value
-    socklen_t addrlen;              // size of ai_addr
-    
-    fd_set master;                  // master fd list
-    fd_set temp;                    // temp fd list
     
     result = Init(server_info);
 	if (result < 0) return result;
@@ -119,17 +113,19 @@ extern int rpcCall(char* name, int* argTypes, void** args) {
 	int argType_size=0;				// counter for argTypes size
 
 	for (int i=0; argTypes[i] != 0; i++) argType_size++;
-	argTypesSize++;
+	argType_size++;
 	
 	requestLen = LENGTH_SIZE + TYPE_SIZE + NAME_SIZE + ARGTYPE_SIZE * argType_size;
 	msglen = NAME_SIZE + ARGTYPE_SIZE * argType_size;
 
 	locReq = new char [requestLen];
 
+    int msgtype = LOC_REQUEST;
+    
 	// place the information into the request buffer
 	memcpy(locReq, &msglen, LENGTH_SIZE);
-	memcpy(locReq+LENGTH_SIZE, LOC_REQUEST, TYPE_SIZE);
-	strcpy(locReq+LENGTH_SIZE+TYPE_SIZE, name, NAME_SIZE);
+	memcpy(locReq+LENGTH_SIZE, &msgtype, TYPE_SIZE);
+	strcpy(locReq+LENGTH_SIZE+TYPE_SIZE, name);
 	memcpy(locReq+LENGTH_SIZE+TYPE_SIZE+NAME_SIZE, argTypes, ARGTYPE_SIZE * argType_size);
 
 	if (send(client_binder_sock, locReq, requestLen, 0) == -1) {
@@ -164,7 +160,7 @@ extern int rpcCall(char* name, int* argTypes, void** args) {
 	Message *loc_reply;
 
     if (loc_replyType == LOC_FAILURE) {
-    	parseMessage(loc_reply, LOC_FAILURE, loc_replyLen);
+    	loc_reply = parseMessage(msgbuf, LOC_FAILURE, loc_replyLen);
     	int errcode = loc_reply->reasonCode;
 
     	delete loc_reply;
@@ -174,7 +170,7 @@ extern int rpcCall(char* name, int* argTypes, void** args) {
 		return errcode;
     }
     else if (loc_replyType == LOC_SUCCESS) {
-    	parseMessage(loc_reply, LOC_SUCCESS, loc_replyLen);
+    	loc_reply = parseMessage(msgbuf, LOC_SUCCESS, loc_replyLen);
 
     	// open connection to requested server
 		char *server_host_name;											// binder address 
@@ -255,10 +251,12 @@ extern int rpcCall(char* name, int* argTypes, void** args) {
 
 		msglen = execLen - LENGTH_SIZE - TYPE_SIZE;
 
+        msgtype = EXECUTE;
+        
 		// place the information into the execute message buffer
 		memcpy(execReq, &msglen, LENGTH_SIZE);
-		memcpy(execReq+LENGTH_SIZE, EXECUTE, TYPE_SIZE);
-		strcpy(execReq+LENGTH_SIZE+TYPE_SIZE, name, NAME_SIZE);
+		memcpy(execReq+LENGTH_SIZE, &msgtype, TYPE_SIZE);
+		strcpy(execReq+LENGTH_SIZE+TYPE_SIZE, name);
 		memcpy(execReq+LENGTH_SIZE+TYPE_SIZE+NAME_SIZE, argTypes, ARGTYPE_SIZE * argType_size);
 
 		char *temp = execReq + LENGTH_SIZE + TYPE_SIZE + NAME_SIZE + ARGTYPE_SIZE * argType_size;			// temp iterator
@@ -301,7 +299,7 @@ extern int rpcCall(char* name, int* argTypes, void** args) {
         Message *exec_reply;
         
         if (exec_replyType == EXECUTE_FAILURE) {
-            parseMessage(exec_reply, EXECUTE_FAILURE, exec_replyLen);
+            exec_reply = parseMessage(msgbuf2, EXECUTE_FAILURE, exec_replyLen);
             int errcode = exec_reply->reasonCode;
             
             delete exec_reply;
@@ -311,7 +309,7 @@ extern int rpcCall(char* name, int* argTypes, void** args) {
             return errcode;
         }
         else if (exec_replyType == EXECUTE_SUCCESS) {
-            parseMessage(exec_reply, EXECUTE_SUCCESS, exec_replyLen);
+            exec_reply = parseMessage(msgbuf2, EXECUTE_SUCCESS, exec_replyLen);
             
             for (int argcounter=0; exec_reply->argTypes[argcounter]!=0; argcounter++) {
                 argTypes[argcounter] = exec_reply->argTypes[argcounter];
@@ -325,7 +323,7 @@ extern int rpcCall(char* name, int* argTypes, void** args) {
 }
 
 extern int rpcCacheCall(char* name, int* argTypes, void** args) {
-    
+    return 0;
 }
 
 extern int rpcRegister(char* name, int* argTypes, skeleton f) {
@@ -344,8 +342,10 @@ extern int rpcRegister(char* name, int* argTypes, skeleton f) {
 	
 	char *buf = new char[LENGTH_SIZE + TYPE_SIZE + length];
 	
+    int msgtype = REGISTER;
+    
 	memcpy(buf, &length, LENGTH_SIZE);
-	memcpy(buf+4, REGISTER, TYPE_SIZE);
+	memcpy(buf+4, &msgtype, TYPE_SIZE);
 	memcpy(buf+8, server_info->address, SERVER_ID_SIZE);
 	memcpy(buf+136, &server_info->port, PORT_SIZE);
 	strcpy(buf+138, name);				
@@ -432,7 +432,6 @@ void *ExecFunc(void *threadarg)
 {
 	thread_data *execArg = (thread_data *)threadarg;	// get the structure containing message and socket id
 	char *unparsedMsg = execArg->message;				// get the raw message
-	int clientSock = execArg->sockfd;					// socket for the client
 
 	// use this to get parsed message;
 	Message *parsedMsg;
@@ -472,7 +471,7 @@ void *ExecFunc(void *threadarg)
 	}
 
 run:
-	int result = *to_run(parsedMsg->argTypes, parsedMsg->args);
+	int result = (*to_run)(parsedMsg->argTypes, parsedMsg->args);
 
 	char *sendMsg;				// msg to send to client
 	int sendMsg_len;			// length of message to send in bytes
@@ -490,14 +489,14 @@ run:
 	}
 
 	// delete parsedMsg and sendmsg
-	delete [] sendMsg;
+	/*delete [] sendMsg;
 	delete [] parsedMsg->server_identifier;
 	delete [] parsedMsg->argTypes;
 	delete [] parsedMsg->name;
 	for (int k=0; k < parsedMsg->argTypesSize-1; k++) {
 		delete [] parsedMsg->args[k];
 	}
-	delete [] parsedMsg->args;
+	delete [] parsedMsg->args;*/
 
 	pthread_exit((void *)threadarg);
 }

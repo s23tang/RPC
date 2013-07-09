@@ -14,7 +14,7 @@
 
 struct Info {
     char *address;
-    unsigned short port;
+    char *port;
     int sockfd;
 };
 
@@ -23,7 +23,7 @@ struct db_struct {
 	int  *argTypes;
     int  argTypeSize;
 	char *address;
-	unsigned short port;
+	char *port;
 };
 
 // a list used as a function database

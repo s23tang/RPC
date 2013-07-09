@@ -71,8 +71,12 @@ int Init(struct Info *info) {
         cout << "Initialization: get socket name error." << endl;
         return(ESNAME);
     };
+    
+    char portstring[2];
+    
+    sprintf(portstring, "%hu", ntohs(taddr.sin_port));
 	
-	info->port = ntohs(taddr.sin_port);
+	info->port = portstring;
 	
 	return 0;
 }
