@@ -35,6 +35,8 @@ extern int rpcInit()
     result = Init(&server_info);
 	if (result < 0) return result;
 	
+    cout << "server listening sock is " << server_info->sockfd << endl;
+    
 	/* done creating socket for acceting connections from clients */
 	
 	// open connection to binder
@@ -64,6 +66,7 @@ extern int rpcInit()
 		
 		break;						// found good socket descriptor
 	}
+    
 	if (counter == NULL) return ESOCK;
 	
 	freeaddrinfo(res);
@@ -332,6 +335,7 @@ extern int rpcRegister(char* name, int* argTypes, skeleton f) {
 	int result;					// for error checking
 	int ret_type;				// whether REGISTER_SUCCESS or REGISTER_FAILURE
 	int ret_val;				// warnings or errors returned
+    int ret_len;                // length of receieved message
 	
     for (argType_size=0; argTypes[argType_size]!=0; argType_size++);
     argType_size++;
@@ -344,24 +348,27 @@ extern int rpcRegister(char* name, int* argTypes, skeleton f) {
     int msgtype = REGISTER;
     
 	memcpy(buf, &length, LENGTH_SIZE);
-	memcpy(buf+4, &msgtype, TYPE_SIZE);
-	memcpy(buf+8, server_info->address, SERVER_ID_SIZE);
-	memcpy(buf+136, &server_info->port, PORT_SIZE);
-	strcpy(buf+138, name);				
-	memcpy(buf+238, argTypes, argType_size);
+	memcpy(buf+LENGTH_SIZE, &msgtype, TYPE_SIZE);
+	memcpy(buf+LENGTH_SIZE+TYPE_SIZE, server_info->address, SERVER_ID_SIZE);
+    strcpy(buf+LENGTH_SIZE+TYPE_SIZE+SERVER_ID_SIZE, server_info->port);
+	//memcpy(buf+LENGTH_SIZE+TYPE_SIZE+SERVER_ID_SIZE, server_info->port, PORT_SIZE);
+	strcpy(buf+LENGTH_SIZE+TYPE_SIZE+SERVER_ID_SIZE+PORT_SIZE, name);				
+	memcpy(buf+LENGTH_SIZE+TYPE_SIZE+SERVER_ID_SIZE+PORT_SIZE+NAME_SIZE, argTypes, argType_size);
 	
 	// buf which is the message to be sent is now filled
-	
-	result = (int) send(binder_sock, (const void *) buf, LENGTH_SIZE + TYPE_SIZE + length, 0);
-	if (result != 0) return ESEND;
-	
+    
+	result = (int) send(binder_sock, buf, LENGTH_SIZE + TYPE_SIZE + length, 0);
+	if (result == -1) return result;
+    
 	// free buf since we are no longer using it
 	delete [] buf;
-	
+    
+    result = (int) recv(binder_sock, &ret_len, 4, 0);
+	if (result < 0) return ERECV;
 	result = (int) recv(binder_sock, &ret_type, 4, 0);
-	if (result != 0) return ERECV;
+	if (result < 0) return ERECV;
 	result = (int) recv(binder_sock, &ret_val, 4, 0);
-	if (result != 0) return ERECV;
+	if (result < 0) return ERECV;
 	
 	// determine if register success
 	
@@ -476,11 +483,11 @@ run:
 	int sendMsg_len;			// length of message to send in bytes
 	if (result < 0) {
 		// error send EXECUTE_FAILURE to client
-		sendMsg_len = createMessage(sendMsg, EXECUTE_FAILURE, result, NULL);
+		sendMsg_len = createMessage(&sendMsg, EXECUTE_FAILURE, result, NULL);
 	}
 	else {
 		// success send results back to client
-		sendMsg_len = createMessage(sendMsg, EXECUTE_SUCCESS, result, parsedMsg);
+		sendMsg_len = createMessage(&sendMsg, EXECUTE_SUCCESS, result, parsedMsg);
 	}
 
 	if (send(execArg->sockfd, sendMsg, sendMsg_len, 0) == -1) {
@@ -688,7 +695,7 @@ extern int rpcTerminate() {
     char *msgbuf;
     int msgbufLen;
     
-    msgbufLen = createMessage(msgbuf, TERMINATE, 0, NULL);
+    msgbufLen = createMessage(&msgbuf, TERMINATE, 0, NULL);
     
     if (send(client_binder_sock, msgbuf, msgbufLen, 0) == -1) {
 		cerr << "ERROR: could not send terminate message to binder" << endl;

@@ -25,9 +25,10 @@ using std::string;
 int Init(struct Info **info) {
     char hostName[128];
 
+    struct addrinfo hints, *res, *counter;  // info for recursing
     struct sockaddr_in saddr, taddr;		// for packing server and a placeholder
 	int sockfd;                             // socket file descriptor for listening, and placeholder
-	int result;								// for checking return values
+	int result, status;						// for checking return values
     
     /* get the host name of the binder machine */
     
@@ -44,6 +45,27 @@ int Init(struct Info **info) {
     
     /* get the socket fd and the free port */
 	
+    memset(&hints, 0 , sizeof hints);
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_PASSIVE;
+	
+	status = getaddrinfo(INADDR_ANY, "0", &hints, &res);
+	if (status != 0) return -6;
+	
+	// go along the linked list for a valid entry
+	for(counter = res; counter != NULL; counter = counter->ai_next) {
+		sockfd = socket(counter->ai_family, counter->ai_socktype, counter->ai_protocol);
+		if (sockfd == -1) continue;	// has not found a socket descriptor
+		
+		status = bind(sockfd, counter->ai_addr, counter->ai_addrlen);
+		if (status == -1) continue; // cannot connect to socket
+		
+		break;						// found good socket descriptor
+	}
+	if (counter == NULL) return -2; // end here
+    
+    /*
 	saddr.sin_family = AF_INET;
 	saddr.sin_port = htons(0);				// next available port
 	saddr.sin_addr.s_addr = INADDR_ANY;		// set ip for any
@@ -57,7 +79,7 @@ int Init(struct Info **info) {
 	if (result == -1) {
         cout << "Initialization: binding socket error." << endl;
         return(EBIND);
-    }
+    }*/
 	
 	result = listen(sockfd, 10);
 	if (result == -1) {
@@ -75,6 +97,8 @@ int Init(struct Info **info) {
     };
     
     char portstring[2];
+    
+    cout << "actual port " << ntohs(taddr.sin_port) << endl;
     
     sprintf(portstring, "%hu", ntohs(taddr.sin_port));
 	

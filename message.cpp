@@ -28,7 +28,10 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
             buf = buf + SERVER_ID_SIZE;
             
             // get the server's port number
-            memcpy(&msg->port, buf, PORT_SIZE);
+            msg->port = new char[PORT_SIZE];
+            //memcpy(msg->port, buf, PORT_SIZE);
+            strcpy(msg->port, buf);
+            
             buf = buf + PORT_SIZE;
             
             // get the function name
@@ -39,7 +42,9 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
             // get the arguement types
             // get the argTypes number first and allocate the argTypes array
             num_argTypes = (length - SERVER_ID_SIZE - PORT_SIZE - NAME_SIZE) / sizeof(int);
-            msg->argTypes = new int[num_argTypes - 1];
+            msg->argTypesSize = num_argTypes;
+            cout << "in message create size is " << msg->argTypesSize << endl;
+            msg->argTypes = new int[num_argTypes];
             
             // loop to add argTypes
             for (int i = 0; i < num_argTypes; i++) {
@@ -57,7 +62,7 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
             // get the arguement types
             // get the argTypes number first and allocate the argTypes array
             num_argTypes = (length - NAME_SIZE) / sizeof(int);
-            msg->argTypes = new int[num_argTypes - 1];
+            msg->argTypes = new int[num_argTypes];
             
             // loop to add argTypes
             for (int i = 0; i < num_argTypes; i++) {
@@ -73,7 +78,8 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
             buf = buf + SERVER_ID_SIZE;
             
             // get the server's port number
-            memcpy(&msg->port, buf, PORT_SIZE);
+            msg->port = new char[PORT_SIZE];
+            memcpy(msg->port, buf, PORT_SIZE);
             
             break;
         case EXECUTE:
@@ -184,7 +190,7 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
 
 
 
-int createMessage(char *buf, int msgType, int retCode, struct Message *oldMsg) {
+int createMessage(char **buf, int msgType, int retCode, struct Message *oldMsg) {
     
     int msgLength = 0;
     
@@ -192,75 +198,75 @@ int createMessage(char *buf, int msgType, int retCode, struct Message *oldMsg) {
         case REGISTER_SUCCESS: {
             // allocate enough memory for the buffer and update the length of the buffer
             msgLength = LENGTH_SIZE + TYPE_SIZE + sizeof(int);
-            buf = new char[msgLength];
+            *buf = new char[msgLength];
             
             // create the REGISTER_SUCCESS message
             int length = sizeof(int);
-            memcpy(buf, &length, LENGTH_SIZE);
-            memcpy(buf + LENGTH_SIZE, &msgType, TYPE_SIZE);
-            memcpy(buf + LENGTH_SIZE + TYPE_SIZE, &retCode, sizeof(int));
+            memcpy(*buf, &length, LENGTH_SIZE);
+            memcpy((*buf) + LENGTH_SIZE, &msgType, TYPE_SIZE);
+            memcpy((*buf) + LENGTH_SIZE + TYPE_SIZE, &retCode, sizeof(int));
             
             break;
         }
         case REGISTER_FAILURE: {
             // allocate enough memory for the buffer and update the length of the buffer
             msgLength = LENGTH_SIZE + TYPE_SIZE + sizeof(int);
-            buf = new char[msgLength];
+            (*buf) = new char[msgLength];
             
             // create the REGISTER_FAILURE message
             int length = sizeof(int);
-            memcpy(buf, &length, LENGTH_SIZE);
-            memcpy(buf + LENGTH_SIZE, &msgType, TYPE_SIZE);
-            memcpy(buf + LENGTH_SIZE + TYPE_SIZE, &retCode, sizeof(int));
+            memcpy((*buf), &length, LENGTH_SIZE);
+            memcpy((*buf) + LENGTH_SIZE, &msgType, TYPE_SIZE);
+            memcpy((*buf) + LENGTH_SIZE + TYPE_SIZE, &retCode, sizeof(int));
             
             break;
         }
         case LOC_SUCCESS: {
             // allocate enough memory for the buffer and update the length of the buffer
             msgLength = LENGTH_SIZE + TYPE_SIZE + SERVER_ID_SIZE + PORT_SIZE;
-            buf = new char[msgLength];
+            (*buf) = new char[msgLength];
             
             // create the LOC_SUCCESS message
             int length = SERVER_ID_SIZE + PORT_SIZE;
-            memcpy(buf, &length, LENGTH_SIZE);
-            memcpy(buf + LENGTH_SIZE, &msgType, TYPE_SIZE);
-            memcpy(buf + LENGTH_SIZE + TYPE_SIZE, oldMsg->server_identifier, SERVER_ID_SIZE);
-            memcpy(buf + LENGTH_SIZE + TYPE_SIZE + SERVER_ID_SIZE, &(oldMsg->port), PORT_SIZE);
+            memcpy((*buf), &length, LENGTH_SIZE);
+            memcpy((*buf) + LENGTH_SIZE, &msgType, TYPE_SIZE);
+            memcpy((*buf) + LENGTH_SIZE + TYPE_SIZE, oldMsg->server_identifier, SERVER_ID_SIZE);
+            memcpy((*buf) + LENGTH_SIZE + TYPE_SIZE + SERVER_ID_SIZE, &(oldMsg->port), PORT_SIZE);
             
             break;
         }
         case LOC_FAILURE: {
             // allocate enough memory for the buffer and update the length of the buffer
             msgLength = LENGTH_SIZE + TYPE_SIZE + sizeof(int);
-            buf = new char[msgLength];
+            (*buf) = new char[msgLength];
             
             // create the LOC_FAILURE message
             int length = sizeof(int);
-            memcpy(buf, &length, LENGTH_SIZE);
-            memcpy(buf + LENGTH_SIZE, &msgType, TYPE_SIZE);
-            memcpy(buf + LENGTH_SIZE + TYPE_SIZE, &retCode, sizeof(int));
+            memcpy((*buf), &length, LENGTH_SIZE);
+            memcpy((*buf) + LENGTH_SIZE, &msgType, TYPE_SIZE);
+            memcpy((*buf) + LENGTH_SIZE + TYPE_SIZE, &retCode, sizeof(int));
             
             break;
         }
         case EXECUTE_SUCCESS: {
             // allocate enough memory for the buffer and update the length of the buffer
             msgLength = LENGTH_SIZE + TYPE_SIZE + NAME_SIZE + ARGTYPE_SIZE * oldMsg->argTypesSize + oldMsg->argsLength;
-            buf = new char[msgLength];
+            (*buf) = new char[msgLength];
             
             // create the EXECUTE_SUCCESS message
             int length = NAME_SIZE + ARGTYPE_SIZE * oldMsg->argTypesSize + oldMsg->argsLength;
-            memcpy(buf, &length, LENGTH_SIZE);
-            memcpy(buf + LENGTH_SIZE, &msgType, TYPE_SIZE);
+            memcpy((*buf), &length, LENGTH_SIZE);
+            memcpy((*buf) + LENGTH_SIZE, &msgType, TYPE_SIZE);
             
-            buf = buf + LENGTH_SIZE + TYPE_SIZE;
+            (*buf) = (*buf) + LENGTH_SIZE + TYPE_SIZE;
             
-            strcpy(buf, oldMsg->name);
-            buf = buf + NAME_SIZE;
+            strcpy((*buf), oldMsg->name);
+            (*buf) = (*buf) + NAME_SIZE;
 
             // loop to add the argtypes to the message
             for (int i = 0; i < oldMsg->argTypesSize; i++) {
-                memcpy(buf, &oldMsg->argTypes[i], sizeof(int));
-                buf = buf + sizeof(int);
+                memcpy((*buf), &oldMsg->argTypes[i], sizeof(int));
+                (*buf) = (*buf) + sizeof(int);
             }
             
             // loop to add different type of args
@@ -290,12 +296,12 @@ int createMessage(char *buf, int msgType, int retCode, struct Message *oldMsg) {
 
                 // check if scalar or array
                 if (arg_length == 0) {
-                    memcpy(buf, oldMsg->args[j], size_of_type);
-                    buf = buf + size_of_type;
+                    memcpy((*buf), oldMsg->args[j], size_of_type);
+                    (*buf) = (*buf) + size_of_type;
                 }
                 else {
-                    memcpy(buf, oldMsg->args[j], arg_length * size_of_type);
-                    buf = buf + arg_length * size_of_type;
+                    memcpy((*buf), oldMsg->args[j], arg_length * size_of_type);
+                    (*buf) = (*buf) + arg_length * size_of_type;
                 }  
             }
             
@@ -304,25 +310,25 @@ int createMessage(char *buf, int msgType, int retCode, struct Message *oldMsg) {
         case EXECUTE_FAILURE: {
             // allocate enough memory for the buffer and update the length of the buffer
             msgLength = LENGTH_SIZE + TYPE_SIZE + sizeof(int);
-            buf = new char[msgLength];
+            (*buf) = new char[msgLength];
             
             // create the EXECUTE_FAILURE message
             int length = sizeof(int);
-            memcpy(buf, &length, LENGTH_SIZE);
-            memcpy(buf + LENGTH_SIZE, &msgType, TYPE_SIZE);
-            memcpy(buf + LENGTH_SIZE + TYPE_SIZE, &retCode, sizeof(int));
+            memcpy((*buf), &length, LENGTH_SIZE);
+            memcpy((*buf) + LENGTH_SIZE, &msgType, TYPE_SIZE);
+            memcpy((*buf) + LENGTH_SIZE + TYPE_SIZE, &retCode, sizeof(int));
             
             break;
         }
         case TERMINATE: {
             // allocate enough memory for the buffer and update the length of the buffer
             msgLength = LENGTH_SIZE + TYPE_SIZE;
-            buf = new char[msgLength];
+            (*buf) = new char[msgLength];
             
             // create the TERMINATE message
             int length = sizeof(int);
-            memcpy(buf, &length, LENGTH_SIZE);
-            memcpy(buf + LENGTH_SIZE, &msgType, TYPE_SIZE);
+            memcpy((*buf), &length, LENGTH_SIZE);
+            memcpy((*buf) + LENGTH_SIZE, &msgType, TYPE_SIZE);
             
             break;
         }

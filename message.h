@@ -26,7 +26,7 @@
 #define TYPE_SIZE			4
 #define SERVER_ID_SIZE		128
 #define NAME_SIZE			100
-#define PORT_SIZE			2
+#define PORT_SIZE			6
 #define ARGTYPE_SIZE        4
 #define RCODE_SIZE          4
 
@@ -45,6 +45,6 @@ struct Message {
 
 struct Message *parseMessage(char *buf, int msgType, int length);
 
-int createMessage(char *sendBuf, int msgType, int retCode, struct Message *oldMsg);
+int createMessage(char **sendBuf, int msgType, int retCode, struct Message *oldMsg);
 
 #endif

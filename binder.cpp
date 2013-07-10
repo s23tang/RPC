@@ -44,6 +44,8 @@ int main(int argc, const char *argv[]) {
     
     int listener = info->sockfd;
     
+    cout << "server listening sockfd " << listener << endl;
+    
     // print the binder infomation
     cout << "BINDER_ADDRESS " << info->address << endl;
     cout << "BINDER_PORT    " << info->port << endl;
@@ -65,6 +67,7 @@ int main(int argc, const char *argv[]) {
     list<struct db_struct*>::iterator it;
     vector<int>::iterator server_it;
     
+    int printOnce =0;
     while (true) {
         
         if (terminate == 1) break;
@@ -77,6 +80,16 @@ int main(int argc, const char *argv[]) {
         
         // run through the existing connections to look for datas to read
         for (int i = 0; i <= maxFdNum; i++) {
+            if (!binder_db.empty() && printOnce == 0) {
+                cout << "here is what is stored" << endl;
+                cout << "name " << binder_db.front()->name << endl;
+                cout << "argTypes " << binder_db.front()->argTypes[0] << " " << binder_db.front()->argTypes[1] << " " << binder_db.front()->argTypes[2] << " " << binder_db.front()->argTypes[3] << endl;
+                cout << "argTypes size " << binder_db.front()->argTypeSize << endl;
+                cout << "address " << binder_db.front()->address << endl;
+                cout << "port " << binder_db.front()->port << endl;
+                printOnce = 1;
+            }
+            
             if (FD_ISSET(i, &temp)) {
 
                 if (i == listener) {
@@ -95,7 +108,7 @@ int main(int argc, const char *argv[]) {
                             }
                             clientNum++;
                             
-                            cout << "Server: new connection from " << inet_ntop(client.ss_family, get_in_addr((struct sockaddr*) &client), clientIP, INET6_ADDRSTRLEN) << " on socket " << new_accept << endl;
+                            cout << "Binder: new connection from " << inet_ntop(client.ss_family, get_in_addr((struct sockaddr*) &client), clientIP, INET6_ADDRSTRLEN) << " on socket " << new_accept << endl;
                         }
                     }
                 } else {
@@ -107,9 +120,9 @@ int main(int argc, const char *argv[]) {
                         // got error or connection closed by client
                         if (nbytes == 0) {
                             // connection closed
-                            cout << "Server: socket " << i << " hung up." << endl;
+                            cout << "Binder: socket " << i << " hung up." << endl;
                         } else {
-                            cerr << "Server: Recieve error." << endl;
+                            cerr << "Binder: Recieve error." << endl;
                         }
                         close(i);
                         FD_CLR(i, &master);
@@ -121,9 +134,9 @@ int main(int argc, const char *argv[]) {
                             // got invalid message or connection closed by client
                             if (nbytes == 0) {
                                 // get
-                                cout << "Server: socket " << i << " hung up." << endl;
+                                cout << "Binder: socket " << i << " hung up." << endl;
                             } else {
-                                cerr << "Server: Recieve error." << endl;
+                                cerr << "Binder: Recieve error." << endl;
                             }
                             close(i);
                             FD_CLR(i, &master);
@@ -134,7 +147,7 @@ int main(int argc, const char *argv[]) {
                             
                             if (servers.size() != 0) {
                                 for (server_it = servers.begin(); server_it != servers.end(); server_it++) {
-                                    int sendLength = createMessage(sendBuf, TERMINATE, 0, NULL);
+                                    int sendLength = createMessage(&sendBuf, TERMINATE, 0, NULL);
                                     result = (int) send(*server_it, sendBuf, sendLength, 0);
                                     if (result < 0) {
                                         cerr << "Binder: Send error, TERMINATE" << endl;
@@ -155,21 +168,19 @@ int main(int argc, const char *argv[]) {
                                 // got invalid message or connection closed by client
                                 if (nbytes == 0) {
                                     // get
-                                    cout << "Server: socket " << i << " hung up." << endl;
+                                    cout << "Binder: socket " << i << " hung up." << endl;
                                 } else {
-                                    cerr << "Server: Recieve error." << endl;
+                                    cerr << "Binder: Recieve error." << endl;
                                 }
                                 close(i);
                                 FD_CLR(i, &master);
                                 clientNum--;
                             } else {
-                                cout << strBuf << endl;
-                                
                                 Message *msg;
                                 
                                 switch (typeBuf) {
                                     case REGISTER: {
-                                        
+                                        cout << "checkign the length of message received " << lenBuf << endl;
                                         // parse the message we recieved
                                         msg = parseMessage(strBuf, typeBuf, lenBuf);
                                         
@@ -213,7 +224,7 @@ int main(int argc, const char *argv[]) {
                                             // if same functions from same servers, create success message
                                             // with warning of overriding
                                             
-                                            int sendLength = createMessage(sendBuf, REGISTER_SUCCESS, REGISTER_WARNING, msg);
+                                            int sendLength = createMessage(&sendBuf, REGISTER_SUCCESS, REGISTER_WARNING, msg);
                                             result = (int) send(i, sendBuf, sendLength, 0);
                                             if (result < 0) {
                                                 cerr << "Binder: Send error, REGISTER_SUCCESS." << endl;
@@ -227,14 +238,20 @@ int main(int argc, const char *argv[]) {
                                             db_entry->port = msg->port;
                                             db_entry->name = msg->name;
                                             db_entry->argTypes = new int[msg->argTypesSize];
-                                            for (int i = 0; i < msg->argTypesSize; i++) {
-                                                db_entry->argTypes[i] = msg->argTypes[i];
+                                            for (int count = 0; count < msg->argTypesSize; count++) {
+                                                db_entry->argTypes[count] = msg->argTypes[count];
                                             }
+                                            db_entry->argTypeSize = msg->argTypesSize;
                                             
                                             binder_db.push_back(db_entry);
                                             
+                                            int sendLength = createMessage(&sendBuf, REGISTER_SUCCESS, 0, msg);
+                                            result = (int) send(i, sendBuf, sendLength, 0);
+                                            if (result < 0) {
+                                                cerr << "Binder: Send error, REGISTER_SUCCESS." << endl;
+                                            }
+                                            
                                         }
-                                        
                                         break;
                                     }
                                     case LOC_REQUEST: {
@@ -274,7 +291,7 @@ int main(int argc, const char *argv[]) {
                                         if (found) {
                                             msg->server_identifier = (*it)->address;
                                             msg->port = (*it)->port;
-                                            int sendLength = createMessage(sendBuf, LOC_SUCCESS, 0, msg);
+                                            int sendLength = createMessage(&sendBuf, LOC_SUCCESS, 0, msg);
                                             result = (int) send(i, sendBuf, sendLength, 0);
                                             if (result < 0) {
                                                 cerr << "Binder: Send error, LOC_SUCCESS." << endl;
@@ -289,7 +306,7 @@ int main(int argc, const char *argv[]) {
                                         } else {
                                             // if we cannot find the same function
                                             // just send the LOC_FAILURE and the reasnoCode
-                                            int sendLength = createMessage(sendBuf, LOC_FAILURE, -1, msg);
+                                            int sendLength = createMessage(&sendBuf, LOC_FAILURE, -1, msg);
                                             result = (int) send(i, sendBuf, sendLength, 0);
                                             if (result < 0) {
                                                 cerr << "Binder: Send error, LOC_FAILURE." << endl;
