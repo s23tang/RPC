@@ -43,7 +43,6 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
             // get the argTypes number first and allocate the argTypes array
             num_argTypes = (length - SERVER_ID_SIZE - PORT_SIZE - NAME_SIZE) / sizeof(int);
             msg->argTypesSize = num_argTypes;
-            cout << "in message create size is " << msg->argTypesSize << endl;
             msg->argTypes = new int[num_argTypes];
             
             // loop to add argTypes

@@ -67,7 +67,7 @@ int main(int argc, const char *argv[]) {
     list<struct db_struct*>::iterator it;
     vector<int>::iterator server_it;
     
-    int printOnce =0;
+    int printOnce =1;
     while (true) {
         
         if (terminate == 1) break;
@@ -80,14 +80,18 @@ int main(int argc, const char *argv[]) {
         
         // run through the existing connections to look for datas to read
         for (int i = 0; i <= maxFdNum; i++) {
-            if (!binder_db.empty() && printOnce == 0) {
+            if (binder_db.size() == printOnce && printOnce < 11) {
                 cout << "here is what is stored" << endl;
-                cout << "name " << binder_db.front()->name << endl;
-                cout << "argTypes " << binder_db.front()->argTypes[0] << " " << binder_db.front()->argTypes[1] << " " << binder_db.front()->argTypes[2] << " " << binder_db.front()->argTypes[3] << endl;
-                cout << "argTypes size " << binder_db.front()->argTypeSize << endl;
-                cout << "address " << binder_db.front()->address << endl;
-                cout << "port " << binder_db.front()->port << endl;
-                printOnce = 1;
+                cout << "name " << binder_db.back()->name << endl;
+                cout << "argTypes ";
+                for (int troll=0; binder_db.back()->argTypes[troll] !=0; troll++){
+                    cout << binder_db.back()->argTypes[troll] << " ";
+                }
+                cout << endl;
+                cout << "argTypes size " << binder_db.back()->argTypeSize << endl;
+                cout << "address " << binder_db.back()->address << endl;
+                cout << "port " << binder_db.back()->port << endl;
+                printOnce++;
             }
             
             if (FD_ISSET(i, &temp)) {
@@ -180,7 +184,6 @@ int main(int argc, const char *argv[]) {
                                 
                                 switch (typeBuf) {
                                     case REGISTER: {
-                                        cout << "checkign the length of message received " << lenBuf << endl;
                                         // parse the message we recieved
                                         msg = parseMessage(strBuf, typeBuf, lenBuf);
                                         
@@ -203,12 +206,26 @@ int main(int argc, const char *argv[]) {
                                         
                                         if (binder_db.size() != 0){
                                             for (it = binder_db.begin(); it != binder_db.end(); it++) {
-                                                if ((msg->name == (*it)->name) && (msg->port == (*it)->port) && (msg->argTypesSize == (*it)->argTypeSize)) {
+                                                if (!strcmp(msg->server_identifier, (*it)->address) && !strcmp(msg->name, (*it)->name) && !strcmp(msg->port, (*it)->port) && (msg->argTypesSize == (*it)->argTypeSize)) {
                                                     int counter = msg->argTypesSize - 1;
                                                     while (counter >= 0) {
                                                         if (msg->argTypes[counter] != (*it)->argTypes[counter]) {
                                                             break;
                                                         }
+                                                        //check that input output bits are the same, and same type for stored and current
+                                                        int s_pre_arg = (int)(*it)->argTypes[counter] & 0xffff0000;
+                                                        int c_pre_arg = (int)msg->argTypes[counter] & 0xffff0000;
+
+                                                        if (s_pre_arg != c_pre_arg) break;
+
+                                                        // check that they are both scalar or both arrays
+                                                        int server_arg_len = (int)(*it)->argTypes[counter] & 0xffff;
+                                                        int curr_arg_len = (int)msg->argTypes[counter] & 0xffff;
+
+                                                        if (!(((server_arg_len > 0) && (curr_arg_len > 0)) || ((server_arg_len == 0) && (curr_arg_len == 0)))) break;
+
+                                                        // both inout are same, type is the same, and they or both scalar or both arrays
+                                                        // then check the next argument type
                                                         counter--;
                                                     }
                                                     if (counter == -1) {
@@ -223,7 +240,7 @@ int main(int argc, const char *argv[]) {
                                         if (!diff) {
                                             // if same functions from same servers, create success message
                                             // with warning of overriding
-                                            
+                                            cout << "I should be coming here once though son" << endl;
                                             int sendLength = createMessage(&sendBuf, REGISTER_SUCCESS, REGISTER_WARNING, msg);
                                             result = (int) send(i, sendBuf, sendLength, 0);
                                             if (result < 0) {

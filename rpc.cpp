@@ -351,7 +351,6 @@ extern int rpcRegister(char* name, int* argTypes, skeleton f) {
 	memcpy(buf+LENGTH_SIZE, &msgtype, TYPE_SIZE);
 	memcpy(buf+LENGTH_SIZE+TYPE_SIZE, server_info->address, SERVER_ID_SIZE);
     strcpy(buf+LENGTH_SIZE+TYPE_SIZE+SERVER_ID_SIZE, server_info->port);
-	//memcpy(buf+LENGTH_SIZE+TYPE_SIZE+SERVER_ID_SIZE, server_info->port, PORT_SIZE);
 	strcpy(buf+LENGTH_SIZE+TYPE_SIZE+SERVER_ID_SIZE+PORT_SIZE, name);				
 	memcpy(buf+LENGTH_SIZE+TYPE_SIZE+SERVER_ID_SIZE+PORT_SIZE+NAME_SIZE, argTypes, argType_size);
 	
@@ -382,10 +381,10 @@ extern int rpcRegister(char* name, int* argTypes, skeleton f) {
 	server_entry->name = new char[strlen(name)+1];
 	server_entry->argTypes = new int[argType_size/4];
 	
-	strcpy(server_entry->name, name);						// copy the name
+	strcpy(server_entry->name, name);							// copy the name
 	memcpy(server_entry->argTypes, argTypes, argType_size);		// copy the argument types
-	server_entry->func = f;									// copy the skeleton (address of function)
-	
+	server_entry->func = f;										// copy the skeleton (address of function)
+
 	// add the entry to the local database;
 	
 	// must do a check here, that does: check if a function with the exact same name, and same argTypes exists
@@ -394,7 +393,7 @@ extern int rpcRegister(char* name, int* argTypes, skeleton f) {
 	int replaced = 0;
 	list<server_func*>::iterator it;
 	for (it=server_db.begin(); it!=server_db.end(); it++) {
-		if (server_entry->name == (*it)->name) {
+		if (!strcmp(server_entry->name, (*it)->name)) {
 			int i;
 			for (i=0; (*it)->argTypes[i] != 0; i++);
 			if (argType_size/4 == ++i) {	// if same size of argument types then check if arguments same
@@ -446,7 +445,7 @@ void *ExecFunc(void *threadarg)
 	// search and find the function on the server database
 	skeleton to_run;
 	for (list<server_func*>::iterator it=server_db.begin(); it != server_db.end(); it++){
-		if (parsedMsg->name == (*it)->name) {
+		if (!strcmp(parsedMsg->name, (*it)->name)) {
 			int i;
 			for (i=0; (*it)->argTypes[i] != 0; i++);
 			if (parsedMsg->argTypesSize == ++i) {	// if same size of argument types then check if arguments same
