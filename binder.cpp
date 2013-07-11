@@ -79,21 +79,21 @@ int main(int argc, const char *argv[]) {
         // run through the existing connections to look for datas to read
         for (int i = 0; i <= maxFdNum; i++) {
             /*if (binder_db.size() == printOnce && printOnce < 11) {
-                cout << "here is what is stored" << endl;
-                cout << "name " << binder_db.back()->name << endl;
-                cout << "argTypes ";
-                for (int troll=0; binder_db.back()->argTypes[troll] !=0; troll++){
-                    cout << binder_db.back()->argTypes[troll] << " ";
-                }
-                cout << endl;
-                cout << "argTypes size " << binder_db.back()->argTypeSize << endl;
-                cout << "address " << binder_db.back()->address << endl;
-                cout << "port " << binder_db.back()->port << endl;
-                printOnce++;
-            }*/
+             cout << "here is what is stored" << endl;
+             cout << "name " << binder_db.back()->name << endl;
+             cout << "argTypes ";
+             for (int troll=0; binder_db.back()->argTypes[troll] !=0; troll++){
+             cout << binder_db.back()->argTypes[troll] << " ";
+             }
+             cout << endl;
+             cout << "argTypes size " << binder_db.back()->argTypeSize << endl;
+             cout << "address " << binder_db.back()->address << endl;
+             cout << "port " << binder_db.back()->port << endl;
+             printOnce++;
+             }*/
             
             if (FD_ISSET(i, &temp)) {
-
+                
                 if (i == listener) {
                     if (clientNum < 5) {
                         // handle new connection
@@ -145,204 +145,286 @@ int main(int argc, const char *argv[]) {
                             clientNum--;
                         } else {
                             
-                        if (typeBuf == TERMINATE) {
-                            
-                            if (servers.size() != 0) {
-                                for (server_it = servers.begin(); server_it != servers.end(); server_it++) {
-                                    int sendLength = createMessage(&sendBuf, TERMINATE, 0, NULL);
-                                    result = (int) send(*server_it, sendBuf, sendLength, 0);
-                                    if (result < 0) {
-                                        cerr << "Binder: Send error, TERMINATE" << endl;
-                                    }
-                                    
-                                    close(*server_it);
-                                }
-                            }
-                            
-                            terminate = 1;
-                            
-                            break;
-                        } else {
-
-                            strBuf = new char[lenBuf + 1];
-                            
-                            if ((nbytes = (int) recv(i, strBuf, lenBuf, 0)) <= 0) {
-                                // got invalid message or connection closed by client
-                                if (nbytes == 0) {
-                                    // get
-                                    cout << "Binder: socket " << i << " hung up." << endl;
-                                } else {
-                                    cerr << "Binder: Recieve error." << endl;
-                                }
-                                close(i);
-                                FD_CLR(i, &master);
-                                clientNum--;
-                            } else {
-                                Message *msg;
+                            if (typeBuf == TERMINATE) {
                                 
-                                switch (typeBuf) {
-                                    case REGISTER: {
-                                        // parse the message we recieved
-                                        msg = parseMessage(strBuf, typeBuf, lenBuf);
-                                        
-                                        // add the new connected server to the servers vector
-                                        bool found = false;
-                                        if (servers.size() != 0) {
-                                            for (server_it = servers.begin(); server_it != servers.end(); server_it++) {
-                                                if (*server_it == i) {
-                                                    found = true;
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                        if (!found) {
-                                            servers.push_back(i);
+                                if (servers.size() != 0) {
+                                    for (server_it = servers.begin(); server_it != servers.end(); server_it++) {
+                                        int sendLength = createMessage(&sendBuf, TERMINATE, 0, NULL);
+                                        result = (int) send(*server_it, sendBuf, sendLength, 0);
+                                        if (result < 0) {
+                                            cerr << "Binder: Send error, TERMINATE" << endl;
                                         }
                                         
-                                        
-                                        bool diff = true;
-                                        
-                                        if (binder_db.size() != 0){
-                                            for (it = binder_db.begin(); it != binder_db.end(); it++) {
-                                                if (!strcmp(msg->server_identifier, (*it)->address) && !strcmp(msg->name, (*it)->name) && !strcmp(msg->port, (*it)->port) && (msg->argTypesSize == (*it)->argTypeSize)) {
-                                                    int counter = msg->argTypesSize - 1;
-                                                    while (counter >= 0) {
-                                                        if (msg->argTypes[counter] != (*it)->argTypes[counter]) {
-                                                            break;
-                                                        }
-                                                        //check that input output bits are the same, and same type for stored and current
-                                                        int s_pre_arg = (int)(*it)->argTypes[counter] & 0xffff0000;
-                                                        int c_pre_arg = (int)msg->argTypes[counter] & 0xffff0000;
-
-                                                        if (s_pre_arg != c_pre_arg) break;
-
-                                                        // check that they are both scalar or both arrays
-                                                        int server_arg_len = (int)(*it)->argTypes[counter] & 0xffff;
-                                                        int curr_arg_len = (int)msg->argTypes[counter] & 0xffff;
-
-                                                        if (!(((server_arg_len > 0) && (curr_arg_len > 0)) || ((server_arg_len == 0) && (curr_arg_len == 0)))) break;
-
-                                                        // both inout are same, type is the same, and they or both scalar or both arrays
-                                                        // then check the next argument type
-                                                        counter--;
-                                                    }
-                                                    if (counter == -1) {
-                                                        diff = false;
-                                                        break;
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        
-                                        if (!diff) {
-                                            // if same functions from same servers, create success message
-                                            // with warning of overriding
-                                            cout << "I should be coming here once though son" << endl;
-                                            int sendLength = createMessage(&sendBuf, REGISTER_SUCCESS, REGISTER_WARNING, msg);
-                                            result = (int) send(i, sendBuf, sendLength, 0);
-                                            if (result < 0) {
-                                                cerr << "Binder: Send error, REGISTER_SUCCESS." << endl;
-                                            }
-                                        } else {
-                                            // if no same functions from same servers,
-                                            // add the new function to the database
-                                            struct db_struct* db_entry = new db_struct();
-                                            
-                                            db_entry->address = msg->server_identifier;
-                                            db_entry->port = msg->port;
-                                            db_entry->name = msg->name;
-                                            db_entry->argTypes = new int[msg->argTypesSize];
-                                            for (int count = 0; count < msg->argTypesSize; count++) {
-                                                db_entry->argTypes[count] = msg->argTypes[count];
-                                            }
-                                            db_entry->argTypeSize = msg->argTypesSize;
-                                            
-                                            binder_db.push_back(db_entry);
-                                            
-                                            int sendLength = createMessage(&sendBuf, REGISTER_SUCCESS, 0, msg);
-                                            result = (int) send(i, sendBuf, sendLength, 0);
-                                            if (result < 0) {
-                                                cerr << "Binder: Send error, REGISTER_SUCCESS." << endl;
-                                            }
-                                            
-                                        }
-                                        break;
+                                        close(*server_it);
                                     }
-                                    case LOC_REQUEST: {
-                                        
-                                        // parse the message we recieved
-                                        msg = parseMessage(strBuf, typeBuf, lenBuf);
-                                        
-                                        // bool value to indicate if we found the same function
-                                        bool found = false;
-                                        
-                                        // loop to scan the database for the same function
-                                        if (binder_db.size() != 0){
-                                            for (it = binder_db.begin(); it != binder_db.end(); it++) {
-                                                if (!strcmp(msg->name, (*it)->name) && (msg->argTypesSize == (*it)->argTypeSize)) {
-                                                    int counter = msg->argTypesSize - 1;
-                                                    while (counter >= 0) {
-                                                        if (msg->argTypes[counter] != (*it)->argTypes[counter]) {
-                                                            break;
-                                                        }
-                                                        //check that input output bits are the same, and same type for stored and current
-                                                        int s_pre_arg = (int)(*it)->argTypes[counter] & 0xffff0000;
-                                                        int c_pre_arg = (int)msg->argTypes[counter] & 0xffff0000;
-
-                                                        if (s_pre_arg != c_pre_arg) break;
-
-                                                        // check that they are both scalar or both arrays
-                                                        int server_arg_len = (int)(*it)->argTypes[counter] & 0xffff;
-                                                        int curr_arg_len = (int)msg->argTypes[counter] & 0xffff;
-
-                                                        if (!(((server_arg_len > 0) && (curr_arg_len > 0)) || ((server_arg_len == 0) && (curr_arg_len == 0)))) break;
-
-                                                        // both inout are same, type is the same, and they or both scalar or both arrays
-                                                        // then check the next argument type
-                                                        counter--;
-                                                    }
-                                                    if (counter == -1) {
+                                }
+                                
+                                terminate = 1;
+                                
+                                break;
+                            } else {
+                                
+                                strBuf = new char[lenBuf + 1];
+                                
+                                if ((nbytes = (int) recv(i, strBuf, lenBuf, 0)) <= 0) {
+                                    // got invalid message or connection closed by client
+                                    if (nbytes == 0) {
+                                        // get
+                                        cout << "Binder: socket " << i << " hung up." << endl;
+                                    } else {
+                                        cerr << "Binder: Recieve error." << endl;
+                                    }
+                                    close(i);
+                                    FD_CLR(i, &master);
+                                    clientNum--;
+                                } else {
+                                    Message *msg;
+                                    
+                                    switch (typeBuf) {
+                                        case REGISTER: {
+                                            // parse the message we recieved
+                                            msg = parseMessage(strBuf, typeBuf, lenBuf);
+                                            
+                                            // add the new connected server to the servers vector
+                                            bool found = false;
+                                            if (servers.size() != 0) {
+                                                for (server_it = servers.begin(); server_it != servers.end(); server_it++) {
+                                                    if (*server_it == i) {
                                                         found = true;
                                                         break;
-                                                    }  
+                                                    }
                                                 }
                                             }
-                                        }
-                                        
-                                        // if we found the same function in the database
-                                        // send LOC_SUCCESS message to the client with the server info
-                                        // further more, we need to modify the database based on the round-robin algorithm
-                                        if (found) {
-                                            msg->server_identifier = (*it)->address;
-                                            msg->port = (*it)->port;
-                                            int sendLength = createMessage(&sendBuf, LOC_SUCCESS, 0, msg);
-                                            result = (int) send(i, sendBuf, sendLength, 0);
-                                            if (result < 0) {
-                                                cerr << "Binder: Send error, LOC_SUCCESS." << endl;
+                                            if (!found) {
+                                                servers.push_back(i);
                                             }
                                             
-                                            for (it = binder_db.begin(); it != binder_db.end(); it++) {
-                                                if ((*it)->address == msg->server_identifier) {
-                                                    // put the functions within the same server to the end of the database
-                                                    binder_db.splice(binder_db.end(), binder_db, it);
+                                            
+                                            bool diff = true;
+                                            
+                                            if (binder_db.size() != 0){
+                                                for (it = binder_db.begin(); it != binder_db.end(); it++) {
+                                                    if (!strcmp(msg->server_identifier, (*it)->address) && !strcmp(msg->name, (*it)->name) && !strcmp(msg->port, (*it)->port) && (msg->argTypesSize == (*it)->argTypeSize)) {
+                                                        int counter = msg->argTypesSize - 1;
+                                                        while (counter >= 0) {
+                                                            if (msg->argTypes[counter] != (*it)->argTypes[counter]) {
+                                                                break;
+                                                            }
+                                                            //check that input output bits are the same, and same type for stored and current
+                                                            int s_pre_arg = (int)(*it)->argTypes[counter] & 0xffff0000;
+                                                            int c_pre_arg = (int)msg->argTypes[counter] & 0xffff0000;
+                                                            
+                                                            if (s_pre_arg != c_pre_arg) break;
+                                                            
+                                                            // check that they are both scalar or both arrays
+                                                            int server_arg_len = (int)(*it)->argTypes[counter] & 0xffff;
+                                                            int curr_arg_len = (int)msg->argTypes[counter] & 0xffff;
+                                                            
+                                                            if (!(((server_arg_len > 0) && (curr_arg_len > 0)) || ((server_arg_len == 0) && (curr_arg_len == 0)))) break;
+                                                            
+                                                            // both inout are same, type is the same, and they or both scalar or both arrays
+                                                            // then check the next argument type
+                                                            counter--;
+                                                        }
+                                                        if (counter == -1) {
+                                                            diff = false;
+                                                            break;
+                                                        }
+                                                    }
                                                 }
                                             }
-                                        } else {
-                                            // if we cannot find the same function
-                                            // just send the LOC_FAILURE and the reasnoCode
-                                            int sendLength = createMessage(&sendBuf, LOC_FAILURE, -1, msg);
-                                            result = (int) send(i, sendBuf, sendLength, 0);
-                                            if (result < 0) {
-                                                cerr << "Binder: Send error, LOC_FAILURE." << endl;
+                                            
+                                            if (!diff) {
+                                                // if same functions from same servers, create success message
+                                                // with warning of overriding
+                                                cout << "I should be coming here once though son" << endl;
+                                                int sendLength = createMessage(&sendBuf, REGISTER_SUCCESS, REGISTER_WARNING, msg);
+                                                result = (int) send(i, sendBuf, sendLength, 0);
+                                                if (result < 0) {
+                                                    cerr << "Binder: Send error, REGISTER_SUCCESS." << endl;
+                                                }
+                                            } else {
+                                                // if no same functions from same servers,
+                                                // add the new function to the database
+                                                struct db_struct* db_entry = new db_struct();
+                                                
+                                                db_entry->address = msg->server_identifier;
+                                                db_entry->port = msg->port;
+                                                db_entry->name = msg->name;
+                                                db_entry->argTypes = new int[msg->argTypesSize];
+                                                for (int count = 0; count < msg->argTypesSize; count++) {
+                                                    db_entry->argTypes[count] = msg->argTypes[count];
+                                                }
+                                                db_entry->argTypeSize = msg->argTypesSize;
+                                                
+                                                binder_db.push_back(db_entry);
+                                                
+                                                int sendLength = createMessage(&sendBuf, REGISTER_SUCCESS, 0, msg);
+                                                result = (int) send(i, sendBuf, sendLength, 0);
+                                                if (result < 0) {
+                                                    cerr << "Binder: Send error, REGISTER_SUCCESS." << endl;
+                                                }
+                                                
                                             }
+                                            break;
                                         }
-                                        
-                                        break;
+                                        case LOC_REQUEST: {
+                                            
+                                            // parse the message we recieved
+                                            msg = parseMessage(strBuf, typeBuf, lenBuf);
+                                            
+                                            // bool value to indicate if we found the same function
+                                            bool found = false;
+                                            
+                                            // loop to scan the database for the same function
+                                            if (binder_db.size() != 0){
+                                                for (it = binder_db.begin(); it != binder_db.end(); it++) {
+                                                    if (!strcmp(msg->name, (*it)->name) && (msg->argTypesSize == (*it)->argTypeSize)) {
+                                                        int counter = msg->argTypesSize - 1;
+                                                        while (counter >= 0) {
+                                                            if (msg->argTypes[counter] != (*it)->argTypes[counter]) {
+                                                                break;
+                                                            }
+                                                            //check that input output bits are the same, and same type for stored and current
+                                                            int s_pre_arg = (int)(*it)->argTypes[counter] & 0xffff0000;
+                                                            int c_pre_arg = (int)msg->argTypes[counter] & 0xffff0000;
+                                                            
+                                                            if (s_pre_arg != c_pre_arg) break;
+                                                            
+                                                            // check that they are both scalar or both arrays
+                                                            int server_arg_len = (int)(*it)->argTypes[counter] & 0xffff;
+                                                            int curr_arg_len = (int)msg->argTypes[counter] & 0xffff;
+                                                            
+                                                            if (!(((server_arg_len > 0) && (curr_arg_len > 0)) || ((server_arg_len == 0) && (curr_arg_len == 0)))) break;
+                                                            
+                                                            // both inout are same, type is the same, and they or both scalar or both arrays
+                                                            // then check the next argument type
+                                                            counter--;
+                                                        }
+                                                        if (counter == -1) {
+                                                            found = true;
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            
+                                            // if we found the same function in the database
+                                            // send LOC_SUCCESS message to the client with the server info
+                                            // further more, we need to modify the database based on the round-robin algorithm
+                                            if (found) {
+                                                msg->server_identifier = (*it)->address;
+                                                msg->port = (*it)->port;
+                                                int sendLength = createMessage(&sendBuf, LOC_SUCCESS, 0, msg);
+                                                result = (int) send(i, sendBuf, sendLength, 0);
+                                                if (result < 0) {
+                                                    cerr << "Binder: Send error, LOC_SUCCESS." << endl;
+                                                }
+                                                
+                                                for (it = binder_db.begin(); it != binder_db.end(); it++) {
+                                                    if ((*it)->address == msg->server_identifier) {
+                                                        // put the functions within the same server to the end of the database
+                                                        binder_db.splice(binder_db.end(), binder_db, it);
+                                                    }
+                                                }
+                                            } else {
+                                                // if we cannot find the same function
+                                                // just send the LOC_FAILURE and the reasnoCode
+                                                int sendLength = createMessage(&sendBuf, LOC_FAILURE, -1, msg);
+                                                result = (int) send(i, sendBuf, sendLength, 0);
+                                                if (result < 0) {
+                                                    cerr << "Binder: Send error, LOC_FAILURE." << endl;
+                                                }
+                                            }
+                                            
+                                            break;
+                                        }
+                                        case CACHE_REQUEST: {
+                                            
+                                            // parse the message we recieved
+                                            msg = parseMessage(strBuf, typeBuf, lenBuf);
+                                            
+                                            // bool value to indicate if we found the same function
+                                            bool found = false;
+                                            
+                                            // loop to scan the database for the same function
+                                            if (binder_db.size() != 0){
+                                                for (it = binder_db.begin(); it != binder_db.end(); it++) {
+                                                    if (!strcmp(msg->name, (*it)->name) && (msg->argTypesSize == (*it)->argTypeSize)) {
+                                                        int counter = msg->argTypesSize - 1;
+                                                        while (counter >= 0) {
+                                                            if (msg->argTypes[counter] != (*it)->argTypes[counter]) {
+                                                                break;
+                                                            }
+                                                            //check that input output bits are the same, and same type for stored and current
+                                                            int s_pre_arg = (int)(*it)->argTypes[counter] & 0xffff0000;
+                                                            int c_pre_arg = (int)msg->argTypes[counter] & 0xffff0000;
+                                                            
+                                                            if (s_pre_arg != c_pre_arg) break;
+                                                            
+                                                            // check that they are both scalar or both arrays
+                                                            int server_arg_len = (int)(*it)->argTypes[counter] & 0xffff;
+                                                            int curr_arg_len = (int)msg->argTypes[counter] & 0xffff;
+                                                            
+                                                            if (!(((server_arg_len > 0) && (curr_arg_len > 0)) || ((server_arg_len == 0) && (curr_arg_len == 0)))) break;
+                                                            
+                                                            // both inout are same, type is the same, and they or both scalar or both arrays
+                                                            // then check the next argument type
+                                                            counter--;
+                                                        }
+                                                        if (counter == -1) {
+                                                            found = true;
+                                                            // if found same function, cache them for processing
+                                                            cache.push_back((*it)->address);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            
+                                            if (found) {
+                                                vector<char*>::iterator cache_it;
+                                                int sendBufLength = LENGTH_SIZE + TYPE_SIZE + cache.size * SERVER_ID_SIZE;
+                                                int cacheLength = cache.size * SERVER_ID_SIZE;
+                                                int msgType = CACHE_SUCCESS;
+                                                
+                                                // create the CACHE_SUCCESS message
+                                                sendBuf = new char[sendBufLength];
+                                                memcpy(sendBuf, &cacheLength, LENGTH_SIZE);
+                                                memcpy(sendBuf + LENGTH_SIZE, &msgType, TYPE_SIZE);
+                                                
+                                                // loop to add server address to the message with specific function name
+                                                int counter = 0;
+                                                for (cache_it = cache.begin(); cache_it != cache.end(); cache_it++) {
+                                                    memcpy(sendBuf + LENGTH_SIZE + TYPE_SIZE + SERVER_ID_SIZE * counter, (*cache_it), SERVER_ID_SIZE);
+                                                    counter++;
+                                                }
+                                                
+                                                // send the server list to the client
+                                                result = (int) send(i, sendBuf, cacheLength, 0);
+                                                if (result < 0) {
+                                                    cerr << "Binder: Send error, CACHE_SUCCESS." << endl;
+                                                }
+                                                
+                                                
+                                            } else {
+                                                // if we cannot find the same function
+                                                // just send the CACHE_FAILURE and the reasnoCode
+                                                int sendLength = createMessage(&sendBuf, CACHE_FAILURE, -1, msg);
+                                                result = (int) send(i, sendBuf, sendLength, 0);
+                                                if (result < 0) {
+                                                    cerr << "Binder: Send error, CACHE_FAILURE." << endl;
+                                                }
+                                                
+                                            }
+                                            
+                                            cache.clear();
+                                            break;
+                                        }
+                                            
+                                        default:
+                                            break;
                                     }
-                                    default:
-                                        break;
                                 }
-                            }
                             }
                         }
                     }
