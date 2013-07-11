@@ -34,8 +34,6 @@ extern int rpcInit()
     
     result = Init(&server_info);
 	if (result < 0) return result;
-	
-    cout << "server listening sock is " << server_info->sockfd << endl;
     
 	/* done creating socket for acceting connections from clients */
 	
@@ -238,7 +236,6 @@ extern int rpcCall(char* name, int* argTypes, void** args) {
             else if (arg_type == ARG_FLOAT) {
                 size_of_type = sizeof(float);
             }
-
             if (arg_length == 0) {
             	argLen_arr[i] = size_of_type;
             	execLen = execLen + size_of_type;
@@ -312,7 +309,6 @@ extern int rpcCall(char* name, int* argTypes, void** args) {
         }
         else if (exec_replyType == EXECUTE_SUCCESS) {
             exec_reply = parseMessage(msgbuf2, EXECUTE_SUCCESS, exec_replyLen);
-            
             for (int argcounter=0; exec_reply->argTypes[argcounter]!=0; argcounter++) {
                 argTypes[argcounter] = exec_reply->argTypes[argcounter];
                 args[argcounter] = exec_reply->args[argcounter];
@@ -476,6 +472,7 @@ void *ExecFunc(void *threadarg)
 	}
 
 run:
+
 	int result = (*to_run)(parsedMsg->argTypes, parsedMsg->args);
 
 	char *sendMsg;				// msg to send to client
@@ -620,9 +617,8 @@ extern int rpcExecute() {	// for this function remember to use threads!!!
 	                        	}
 	                        	// if too many threads leads to corruption, can set check on vec_count < N
 	                        	// where N is the max number of concurrent threads running
-
 	                        	threadList.push_back(new pthread_t);
-	                        	thread_data *execData = new thread_data;
+	                        	struct thread_data *execData = new thread_data;
 	                        	execData->message = msgbuf;
 	                        	execData->messagelen = msglen;
 	                        	execData->sockfd = i;

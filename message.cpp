@@ -61,6 +61,7 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
             // get the arguement types
             // get the argTypes number first and allocate the argTypes array
             num_argTypes = (length - NAME_SIZE) / sizeof(int);
+            msg->argTypesSize = num_argTypes;
             msg->argTypes = new int[num_argTypes];
             
             // loop to add argTypes
@@ -78,7 +79,7 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
             
             // get the server's port number
             msg->port = new char[PORT_SIZE];
-            memcpy(msg->port, buf, PORT_SIZE);
+            strcpy(msg->port, buf);
             
             break;
         case EXECUTE:
@@ -109,13 +110,18 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
             
             // add argTypes
             memcpy(msg->argTypes, buf, ARGTYPE_SIZE*num_argTypes);
-            
+            buf = buf + ARGTYPE_SIZE*num_argTypes;
+
+            msg->args = new void*[num_argTypes-1];
+
             // used to update the total length of the args
             msg->argsLength = 0;
             // loop to add different type of args
             for (int j = 0; j < num_argTypes - 1; j++) {
                 int arg_type = (msg->argTypes[j] >> (8*2)) & 0xff;
                 int arg_length = msg->argTypes[j] & 0xffff;
+
+                if (arg_length == 0) arg_length = 1;
                 
                 switch (arg_type) {
                     case ARG_CHAR: {
@@ -131,7 +137,7 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
                         memcpy(curArgs, buf, arg_length * sizeof(short));
                         msg->args[j] = (void *)curArgs;
                         buf = buf + arg_length * sizeof(short);
-                        msg->argsLength = msg->argsLength + arg_length;
+                        msg->argsLength = msg->argsLength + arg_length*sizeof(short);
                         break;
                     }
                     case ARG_INT: {
@@ -139,7 +145,7 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
                         memcpy(curArgs, buf, arg_length * sizeof(int));
                         msg->args[j] = (void *)curArgs;
                         buf = buf + arg_length * sizeof(int);
-                        msg->argsLength = msg->argsLength + arg_length;
+                        msg->argsLength = msg->argsLength + arg_length * sizeof(int);
                         break;
                     }
                     case ARG_LONG: {
@@ -147,7 +153,7 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
                         memcpy(curArgs, buf, arg_length * sizeof(long));
                         msg->args[j] = (void *)curArgs;
                         buf = buf + arg_length * sizeof(long);
-                        msg->argsLength = msg->argsLength + arg_length;
+                        msg->argsLength = msg->argsLength + arg_length * sizeof(long);
                         break;
                     }
                     case ARG_DOUBLE: {
@@ -155,7 +161,7 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
                         memcpy(curArgs, buf, arg_length * sizeof(double));
                         msg->args[j] = (void *)curArgs;
                         buf = buf + arg_length * sizeof(double);
-                        msg->argsLength = msg->argsLength + arg_length;
+                        msg->argsLength = msg->argsLength + arg_length * sizeof(double);
                         break;
                     }
                     case ARG_FLOAT: {
@@ -163,7 +169,7 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
                         memcpy(curArgs, buf, arg_length * sizeof(float));
                         msg->args[j] = (void *)curArgs;
                         buf = buf + arg_length * sizeof(float);
-                        msg->argsLength = msg->argsLength + arg_length;
+                        msg->argsLength = msg->argsLength + arg_length * sizeof(float);
                         break;
                     }
                     default:
@@ -229,8 +235,8 @@ int createMessage(char **buf, int msgType, int retCode, struct Message *oldMsg) 
             int length = SERVER_ID_SIZE + PORT_SIZE;
             memcpy((*buf), &length, LENGTH_SIZE);
             memcpy((*buf) + LENGTH_SIZE, &msgType, TYPE_SIZE);
-            memcpy((*buf) + LENGTH_SIZE + TYPE_SIZE, oldMsg->server_identifier, SERVER_ID_SIZE);
-            memcpy((*buf) + LENGTH_SIZE + TYPE_SIZE + SERVER_ID_SIZE, &(oldMsg->port), PORT_SIZE);
+            strcpy((*buf) + LENGTH_SIZE + TYPE_SIZE, oldMsg->server_identifier);
+            strcpy((*buf) + LENGTH_SIZE + TYPE_SIZE + SERVER_ID_SIZE, oldMsg->port);
             
             break;
         }
@@ -251,23 +257,22 @@ int createMessage(char **buf, int msgType, int retCode, struct Message *oldMsg) 
             // allocate enough memory for the buffer and update the length of the buffer
             msgLength = LENGTH_SIZE + TYPE_SIZE + NAME_SIZE + ARGTYPE_SIZE * oldMsg->argTypesSize + oldMsg->argsLength;
             (*buf) = new char[msgLength];
-            
+
             // create the EXECUTE_SUCCESS message
             int length = NAME_SIZE + ARGTYPE_SIZE * oldMsg->argTypesSize + oldMsg->argsLength;
             memcpy((*buf), &length, LENGTH_SIZE);
+
             memcpy((*buf) + LENGTH_SIZE, &msgType, TYPE_SIZE);
             
             (*buf) = (*buf) + LENGTH_SIZE + TYPE_SIZE;
-            
+
             strcpy((*buf), oldMsg->name);
             (*buf) = (*buf) + NAME_SIZE;
 
-            // loop to add the argtypes to the message
-            for (int i = 0; i < oldMsg->argTypesSize; i++) {
-                memcpy((*buf), &oldMsg->argTypes[i], sizeof(int));
-                (*buf) = (*buf) + sizeof(int);
-            }
+            memcpy((*buf), oldMsg->argTypes, ARGTYPE_SIZE*oldMsg->argTypesSize);
+            (*buf) = (*buf) + ARGTYPE_SIZE*oldMsg->argTypesSize;
             
+            int bytes_read = 0;                         //track how many bytes gone
             // loop to add different type of args
             for (int j = 0; j < oldMsg->argTypesSize - 1; j++) {
                 int arg_type = (oldMsg->argTypes[j] >> (8*2)) & 0xff;
@@ -297,12 +302,16 @@ int createMessage(char **buf, int msgType, int retCode, struct Message *oldMsg) 
                 if (arg_length == 0) {
                     memcpy((*buf), oldMsg->args[j], size_of_type);
                     (*buf) = (*buf) + size_of_type;
+                    bytes_read = bytes_read + size_of_type;
                 }
                 else {
                     memcpy((*buf), oldMsg->args[j], arg_length * size_of_type);
                     (*buf) = (*buf) + arg_length * size_of_type;
+                    bytes_read = bytes_read + arg_length * size_of_type;
                 }  
             }
+
+            (*buf) = (*buf)- LENGTH_SIZE - TYPE_SIZE - NAME_SIZE - ARGTYPE_SIZE*oldMsg->argTypesSize - bytes_read;
             
             break;
         }

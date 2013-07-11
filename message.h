@@ -45,6 +45,6 @@ struct Message {
 
 struct Message *parseMessage(char *buf, int msgType, int length);
 
-int createMessage(char **sendBuf, int msgType, int retCode, struct Message *oldMsg);
+int createMessage(char **buf, int msgType, int retCode, struct Message *oldMsg);
 
 #endif

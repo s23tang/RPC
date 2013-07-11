@@ -98,8 +98,6 @@ int Init(struct Info **info) {
     
     char portstring[2];
     
-    cout << "actual port " << ntohs(taddr.sin_port) << endl;
-    
     sprintf(portstring, "%hu", ntohs(taddr.sin_port));
 	
     char *actPort = new char[2];

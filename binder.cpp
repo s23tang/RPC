@@ -44,8 +44,6 @@ int main(int argc, const char *argv[]) {
     
     int listener = info->sockfd;
     
-    cout << "server listening sockfd " << listener << endl;
-    
     // print the binder infomation
     cout << "BINDER_ADDRESS " << info->address << endl;
     cout << "BINDER_PORT    " << info->port << endl;
@@ -67,7 +65,7 @@ int main(int argc, const char *argv[]) {
     list<struct db_struct*>::iterator it;
     vector<int>::iterator server_it;
     
-    int printOnce =1;
+    //int printOnce =1;
     while (true) {
         
         if (terminate == 1) break;
@@ -80,7 +78,7 @@ int main(int argc, const char *argv[]) {
         
         // run through the existing connections to look for datas to read
         for (int i = 0; i <= maxFdNum; i++) {
-            if (binder_db.size() == printOnce && printOnce < 11) {
+            /*if (binder_db.size() == printOnce && printOnce < 11) {
                 cout << "here is what is stored" << endl;
                 cout << "name " << binder_db.back()->name << endl;
                 cout << "argTypes ";
@@ -92,7 +90,7 @@ int main(int argc, const char *argv[]) {
                 cout << "address " << binder_db.back()->address << endl;
                 cout << "port " << binder_db.back()->port << endl;
                 printOnce++;
-            }
+            }*/
             
             if (FD_ISSET(i, &temp)) {
 
@@ -232,7 +230,6 @@ int main(int argc, const char *argv[]) {
                                                         diff = false;
                                                         break;
                                                     }
-                                                    
                                                 }
                                             }
                                         }
@@ -282,22 +279,32 @@ int main(int argc, const char *argv[]) {
                                         // loop to scan the database for the same function
                                         if (binder_db.size() != 0){
                                             for (it = binder_db.begin(); it != binder_db.end(); it++) {
-                                                if ((msg->name == (*it)->name) && (msg->argTypesSize == (*it)->argTypeSize)) {
+                                                if (!strcmp(msg->name, (*it)->name) && (msg->argTypesSize == (*it)->argTypeSize)) {
                                                     int counter = msg->argTypesSize - 1;
-                                                    
-                                                    // loop to scan the argtypes to see if the two functions are the same
                                                     while (counter >= 0) {
                                                         if (msg->argTypes[counter] != (*it)->argTypes[counter]) {
                                                             break;
                                                         }
+                                                        //check that input output bits are the same, and same type for stored and current
+                                                        int s_pre_arg = (int)(*it)->argTypes[counter] & 0xffff0000;
+                                                        int c_pre_arg = (int)msg->argTypes[counter] & 0xffff0000;
+
+                                                        if (s_pre_arg != c_pre_arg) break;
+
+                                                        // check that they are both scalar or both arrays
+                                                        int server_arg_len = (int)(*it)->argTypes[counter] & 0xffff;
+                                                        int curr_arg_len = (int)msg->argTypes[counter] & 0xffff;
+
+                                                        if (!(((server_arg_len > 0) && (curr_arg_len > 0)) || ((server_arg_len == 0) && (curr_arg_len == 0)))) break;
+
+                                                        // both inout are same, type is the same, and they or both scalar or both arrays
+                                                        // then check the next argument type
                                                         counter--;
                                                     }
-                                                    
-                                                    // got the function here
                                                     if (counter == -1) {
                                                         found = true;
                                                         break;
-                                                    }
+                                                    }  
                                                 }
                                             }
                                         }
