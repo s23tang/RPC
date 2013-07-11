@@ -240,6 +240,7 @@ int createMessage(char **buf, int msgType, int retCode, struct Message *oldMsg) 
             
             break;
         }
+        case CACHE_FAILURE:
         case LOC_FAILURE: {
             // allocate enough memory for the buffer and update the length of the buffer
             msgLength = LENGTH_SIZE + TYPE_SIZE + sizeof(int);
