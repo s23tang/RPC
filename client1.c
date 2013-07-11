@@ -165,7 +165,3 @@ int main() {
     /* end of client.c */
     return 0;
 }
-
-
-
-

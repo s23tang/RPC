@@ -170,6 +170,7 @@ extern int rpcCall(char* name, int* argTypes, void** args) {
 		return errcode;
     }
     else if (loc_replyType == LOC_SUCCESS) {
+		close(client_binder_sock);
     	loc_reply = parseMessage(msgbuf, LOC_SUCCESS, loc_replyLen);
 
     	// open connection to requested server
@@ -313,6 +314,8 @@ extern int rpcCall(char* name, int* argTypes, void** args) {
                 argTypes[argcounter] = exec_reply->argTypes[argcounter];
                 args[argcounter] = exec_reply->args[argcounter];
             }
+
+            close(server_sock);
             
         }/*else if EXECUTE_SUCCESS*/
     }/*else if LOC_SUCCESS*/
