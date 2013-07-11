@@ -375,7 +375,7 @@ int main(int argc, const char *argv[]) {
                                                         if (counter == -1) {
                                                             found = true;
                                                             // if found same function, cache them for processing
-                                                            cache.push_back((*it)->address);
+                                                            cache.push_back(make_pair(((*it)->address, (*it)->port)));
                                                         }
                                                     }
                                                 }
@@ -383,19 +383,22 @@ int main(int argc, const char *argv[]) {
                                             
                                             if (found) {
                                                 vector<char*>::iterator cache_it;
-                                                int sendBufLength = LENGTH_SIZE + TYPE_SIZE + cache.size * SERVER_ID_SIZE;
-                                                int cacheLength = cache.size * SERVER_ID_SIZE;
+                                                int sendBufLength = LENGTH_SIZE + TYPE_SIZE + cache.size() * SERVER_ID_SIZE + cache.size() * PORT_SIZE;
+                                                int cacheLength = cache.size() * SERVER_ID_SIZE + cache.size() * PORT_SIZE;
                                                 int msgType = CACHE_SUCCESS;
                                                 
                                                 // create the CACHE_SUCCESS message
                                                 sendBuf = new char[sendBufLength];
                                                 memcpy(sendBuf, &cacheLength, LENGTH_SIZE);
                                                 memcpy(sendBuf + LENGTH_SIZE, &msgType, TYPE_SIZE);
+                                                sendBuf = sendBuf + LENGTH_SIZE + TYPE_SIZE;
                                                 
                                                 // loop to add server address to the message with specific function name
                                                 int counter = 0;
                                                 for (cache_it = cache.begin(); cache_it != cache.end(); cache_it++) {
-                                                    memcpy(sendBuf + LENGTH_SIZE + TYPE_SIZE + SERVER_ID_SIZE * counter, (*cache_it), SERVER_ID_SIZE);
+                                                    memcpy(sendBuf, (*cache_it)->first, SERVER_ID_SIZE);
+                                                    strcpy(sendBuf, (*cache_it)->second);
+                                                    sendBuf = sendBuf + SERVER_ID_SIZE + PORT_SIZE;
                                                     counter++;
                                                 }
                                                 
