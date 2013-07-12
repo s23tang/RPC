@@ -412,7 +412,7 @@ int main(int argc, const char *argv[]) {
                                             } else {
                                                 // if we cannot find the same function
                                                 // just send the CACHE_FAILURE and the reasnoCode
-                                                int sendLength = createMessage(&sendBuf, CACHE_FAILURE, -1, msg);
+                                                int sendLength = createMessage(&sendBuf, CACHE_FAILURE, -11, msg);
                                                 result = (int) send(i, sendBuf, sendLength, 0);
                                                 if (result < 0) {
                                                     cerr << "Binder: Send error, CACHE_FAILURE." << endl;
