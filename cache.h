@@ -19,7 +19,7 @@ struct cache_entry {
     char                        *name;
     int                         *argTypes;
     int                         argTypeSize;
-    list<pair<char*, char*>>    server_list;
+    list<pair<char*, char*> >    server_list;
 };
 
 list<cache_entry*> cache;

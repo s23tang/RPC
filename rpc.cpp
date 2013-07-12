@@ -327,7 +327,7 @@ extern int rpcCall(char* name, int* argTypes, void** args) {
 extern int rpcCacheCall(char* name, int* argTypes, void** args) {
     
     list<struct cache_entry>::iterator it;
-    list<pair<char*, char*>>::iterator server_list_it;
+    list<pair<char*, char*> >::iterator server_list_it;
     
     int msgType;
     int sendLength;
@@ -516,7 +516,7 @@ return 0;
 
 void directSendToServer(char* server_host_name, char* server_port_num) {
     
-    list<pair<char*, char*>>::iterator server_list_it;
+    list<pair<char*, char*> >::iterator server_list_it;
     int result;
     
     
@@ -666,7 +666,7 @@ void directSendToServer(char* server_host_name, char* server_port_num) {
 }
 
 int cache_request(char* name, int* argTypes) {
-    list<pair<char*, char*>>::iterator server_list_it;
+    list<pair<char*, char*> >::iterator server_list_it;
     
     int msgType;
     int sendLength;
