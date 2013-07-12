@@ -6,7 +6,7 @@ librpc.a: rpc.o initialization.o message.o
 binder: binder.o 
 	g++ -g -L. binder.o -lrpc -o binder
 
-rpc.o: rpc.cpp error.h binder.h initialization.h message.h rpc.h server_func.h
+rpc.o: rpc.cpp error.h binder.h initialization.h message.h rpc.h server_func.h cache.h
 	g++ -pthread -c rpc.cpp
 
 binder.o: binder.cpp binder.h initialization.h message.h
