@@ -9,7 +9,7 @@
 #ifndef _cache_h
 #define _cache_h
 
-#include <pair>
+#include <utility>
 #include <list>
 #include "rpc.h"
 
