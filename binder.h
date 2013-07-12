@@ -11,6 +11,7 @@
 
 #include <list>
 #include <vector>
+#include <pair>
 
 struct db_struct {
 	char *name;
@@ -25,5 +26,9 @@ std::list<db_struct*> binder_db;
 
 // a vector to record connected servers
 std::vector<int> servers;
+
+// a vector for caching
+std::vector<pair<char*, char*>> cache;
+
 
 #endif /* defined(__RPC__binder__) */

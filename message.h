@@ -19,10 +19,12 @@
 #define EXECUTE_SUCCESS     7
 #define EXECUTE_FAILURE     8
 #define TERMINATE           9
+#define CACHE_REQUEST       11
+#define CACHE_FAILURE       12
 
 #define REGISTER_WARNING    10
 
-#define LENGTH_SIZE			4
+#define LENGTH_SIZE    		4
 #define TYPE_SIZE			4
 #define SERVER_ID_SIZE		128
 #define NAME_SIZE			100

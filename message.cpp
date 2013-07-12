@@ -52,6 +52,7 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
             }
             
             break;
+        case CACHE_REQUEST:
         case LOC_REQUEST:
             // get the function name
             msg->name = new char[strlen(buf) + 1];
@@ -240,6 +241,7 @@ int createMessage(char **buf, int msgType, int retCode, struct Message *oldMsg) 
             
             break;
         }
+        case CACHE_FAILURE:
         case LOC_FAILURE: {
             // allocate enough memory for the buffer and update the length of the buffer
             msgLength = LENGTH_SIZE + TYPE_SIZE + sizeof(int);
