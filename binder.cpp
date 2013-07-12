@@ -330,7 +330,7 @@ int main(int argc, const char *argv[]) {
                                         } else {
                                             // if we cannot find the same function
                                             // just send the LOC_FAILURE and the reasnoCode
-                                            int sendLength = createMessage(&sendBuf, LOC_FAILURE, -11, msg);
+                                            int sendLength = createMessage(&sendBuf, LOC_FAILURE, -1, msg);
                                             result = (int) send(i, sendBuf, sendLength, 0);
                                             if (result < 0) {
                                                 cerr << "Binder: Send error, LOC_FAILURE." << endl;
