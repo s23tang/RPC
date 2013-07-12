@@ -19,4 +19,5 @@
 #define ERECV 	-8
 #define ESELECT	-9
 #define ETHREAD -10
+#define ENOFUNC	-11
 #endif
