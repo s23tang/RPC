@@ -324,6 +324,135 @@ extern int rpcCall(char* name, int* argTypes, void** args) {
 }
 
 extern int rpcCacheCall(char* name, int* argTypes, void** args) {
+    
+    vector<struct cache_entry>::iterator it;
+    int msgType;
+    int sendLength;
+    char *sendBuf;
+    char *msgBuf;
+    
+    int result;					// for error checking
+	int ret_type;				// whether REGISTER_SUCCESS or REGISTER_FAILURE
+	int ret_val;				// warnings or errors returned
+    int ret_len;                // length of receieved message
+
+    struct Message *reply;      // the reply message
+    
+    // get the number of argument types
+    int argTypesSize = 0;
+    for (int i = 0; argTypes[i] != 0; i++) argTypesSize++;
+    argTypesSize++;
+    
+    // bool value to indicate if we found the same function
+    bool found = false;
+    
+    // loop to scan the database for the same function
+        for (it = cache.begin(); it != cache.end(); it++) {
+            if (!strcmp(name, (*it)->name) && (argTypesSize == (*it)->argTypeSize)) {
+                int counter = argTypesSize - 1;
+                while (counter >= 0) {
+                    if (argTypes[counter] != (*it)->argTypes[counter]) {
+                        break;
+                    }
+                    //check that input output bits are the same, and same type for stored and current
+                    int s_pre_arg = (int)(*it)->argTypes[counter] & 0xffff0000;
+                    int c_pre_arg = (int)argTypes[counter] & 0xffff0000;
+                    
+                    if (s_pre_arg != c_pre_arg) break;
+                    
+                    // check that they are both scalar or both arrays
+                    int server_arg_len = (int)(*it)->argTypes[counter] & 0xffff;
+                    int curr_arg_len = (int)argTypes[counter] & 0xffff;
+                    
+                    if (!(((server_arg_len > 0) && (curr_arg_len > 0)) || ((server_arg_len == 0) && (curr_arg_len == 0)))) break;
+                    
+                    // both inout are same, type is the same, and they or both scalar or both arrays
+                    // then check the next argument type
+                    counter--;
+                }
+                if (counter == -1) {
+                    found = true;
+                    // if found same function, break out of the loop
+                    break;
+                }
+            }
+        }
+    
+    if (found) {
+        vector<pair<char*, char*>>::iterator server_list_it;
+        // get the server list from the database
+        vector<pair<char*, char*>> server_list = (*it)->server_list;
+        
+        int sendBufLength = LENGTH_SIZE + TYPE_SIZE + cache.size() * SERVER_ID_SIZE + cache.size() * PORT_SIZE;
+        int cacheLength = cache.size() * SERVER_ID_SIZE + cache.size() * PORT_SIZE;
+        int msgType = CACHE_SUCCESS;
+        
+        // create the CACHE_SUCCESS message
+        sendBuf = new char[sendBufLength];
+        memcpy(sendBuf, &cacheLength, LENGTH_SIZE);
+        memcpy(sendBuf + LENGTH_SIZE, &msgType, TYPE_SIZE);
+        sendBuf = sendBuf + LENGTH_SIZE + TYPE_SIZE;
+        
+        // loop to add server address to the message with specific function name
+        int counter = 0;
+        for (cache_it = cache.begin(); cache_it != cache.end(); cache_it++) {
+            memcpy(sendBuf, (*cache_it)->first, SERVER_ID_SIZE);
+            strcpy(sendBuf, (*cache_it)->second);
+            sendBuf = sendBuf + SERVER_ID_SIZE + PORT_SIZE;
+            counter++;
+        }
+        
+        // send the server list to the client
+        result = (int) send(i, sendBuf, cacheLength, 0);
+        if (result < 0) {
+            cerr << "Binder: Send error, CACHE_SUCCESS." << endl;
+        }
+        
+        
+    } else {
+        // if we cannot find the same function
+        // just send the CACHE_REQUEST to the binder to update the server list
+        
+        sendLength = NAME_SIZE + argType_size * 4;
+        sendBuf = new char[LENGTH_SIZE + TYPE_SIZE + sendLength];
+        msgType = CACHE_REQUEST;
+        
+        memcpy(buf, &sendLength, LENGTH_SIZE);
+        memcpy(buf+LENGTH_SIZE, &msgtype, TYPE_SIZE);
+        strcpy(buf+LENGTH_SIZE+TYPE_SIZE, name);
+        memcpy(buf+LENGTH_SIZE+TYPE_SIZE+NAME_SIZE, argTypes, argType_size);
+
+        // send CACHE_REQUEST to binder
+        result = (int) send(binder_sock, sendBuf, LENGTH_SIZE + TYPE_SIZE + sendLength, 0);
+        if (result < 0) {
+            cerr << "rpcCacheCall: Send error, CACHE_FAILURE." << endl;
+        }
+        
+        // receive the reply from binder
+        result = (int) recv(binder_sock, &ret_len, 4, 0);
+        if (result < 0) return ERECV;
+        result = (int) recv(binder_sock, &ret_type, 4, 0);
+        if (result < 0) return ERECV;
+        result = (int) recv(binder_sock, &ret_val, 4, 0);
+        if (result < 0) return ERECV;
+        
+        msgBuf = new char[ret_len];
+        
+        
+        if (reply->type == CACHE_SUCCESS) {
+            reply = parseMessage(msgBuf, CACHE_SUCCESS, ret_len);
+            int errcode = reply->reasonCode;
+            
+            delete loc_reply;
+            delete [] msgbuf;
+            close(client_binder_sock);
+            
+            return errcode;
+        }
+        else if (loc_replyType == CACHE_FAILURE) {
+        }
+    }
+
     return 0;
 }
 
@@ -350,7 +479,7 @@ extern int rpcRegister(char* name, int* argTypes, skeleton f) {
 	memcpy(buf+LENGTH_SIZE, &msgtype, TYPE_SIZE);
 	memcpy(buf+LENGTH_SIZE+TYPE_SIZE, server_info->address, SERVER_ID_SIZE);
     strcpy(buf+LENGTH_SIZE+TYPE_SIZE+SERVER_ID_SIZE, server_info->port);
-	strcpy(buf+LENGTH_SIZE+TYPE_SIZE+SERVER_ID_SIZE+PORT_SIZE, name);				
+	strcpy(buf+LENGTH_SIZE+TYPE_SIZE+SERVER_ID_SIZE+PORT_SIZE, name);
 	memcpy(buf+LENGTH_SIZE+TYPE_SIZE+SERVER_ID_SIZE+PORT_SIZE+NAME_SIZE, argTypes, argType_size);
 	
 	// buf which is the message to be sent is now filled

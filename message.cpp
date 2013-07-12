@@ -52,6 +52,7 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
             }
             
             break;
+        case CACHE_REQUEST:
         case LOC_REQUEST:
             // get the function name
             msg->name = new char[strlen(buf) + 1];

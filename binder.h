@@ -11,6 +11,7 @@
 
 #include <list>
 #include <vector>
+#include <pair>
 
 struct db_struct {
 	char *name;
