@@ -324,200 +324,13 @@ extern int rpcCall(char* name, int* argTypes, void** args) {
     return 0;
 }
 
-extern int rpcCacheCall(char* name, int* argTypes, void** args) {
-    
-    list<struct cache_entry>::iterator it;
-    list<pair<char*, char*> >::iterator server_list_it;
-    
-    int msgType;
-    int sendLength;
-    char *sendBuf;
-    char *msgBuf;
-    
-    int counter;
-    int result;
-    
-    // get the number of argument types
-    int argTypesSize = 0;
-    for (int i = 0; argTypes[i] != 0; i++) argTypesSize++;
-    argTypesSize++;
-    
-    // bool value to indicate if we found the same function
-    bool found = false;
-    
-    // loop to scan the database for the same function
-    for (it = cache.begin(); it != cache.end(); it++) {
-        if (!strcmp(name, (*it)->name) && (argTypesSize == (*it)->argTypeSize)) {
-            int counter = argTypesSize - 1;
-            while (counter >= 0) {
-                if (argTypes[counter] != (*it)->argTypes[counter]) {
-                    break;
-                }
-                //check that input output bits are the same, and same type for stored and current
-                int s_pre_arg = (int)(*it)->argTypes[counter] & 0xffff0000;
-                int c_pre_arg = (int)argTypes[counter] & 0xffff0000;
-                
-                if (s_pre_arg != c_pre_arg) break;
-                
-                // check that they are both scalar or both arrays
-                int server_arg_len = (int)(*it)->argTypes[counter] & 0xffff;
-                int curr_arg_len = (int)argTypes[counter] & 0xffff;
-                
-                if (!(((server_arg_len > 0) && (curr_arg_len > 0)) || ((server_arg_len == 0) && (curr_arg_len == 0)))) break;
-                
-                // both inout are same, type is the same, and they or both scalar or both arrays
-                // then check the next argument type
-                counter--;
-            }
-            if (counter == -1) {
-                found = true;
-                // if found same function, break out of the loop
-                break;
-            }
-        }
-    }
-    
-    if (found) {
-        bool sent = false;
-        
-        for (server_list_it = (*it)->server_list.begin(); server_list_it != (*it)->server_list.end(); server_list_it++) {
-            
-            // open connection to requested server
-            char *server_host_name;
-            char *server_port_num;
-            
-            // get server address and port from environment variable
-            server_host_name = (*server_list_it)->first;
-            server_port_num = (*server_list_it)->second;
-            
-            // call the server directly
-            result = directSendToServer(server_host_name, server_port_num);
-            
-            if (result == 0) {
-                // call the server successfully
-                sent = true;
-                
-                // modify the cache according to round robin
-                for (it = cache.begin(); it != cache.end(); it++) {
-                    for (server_list_it = (*it)->server_list.begin(); server_list_it != (*it)->server_list.end(); server_list_it++) {
-                        if ((*server_list_it)->first == server_host_name) {
-                            (*it)->server_list.splice((*it)->server_list.end(), (*it)->server_list, server_list_it);
-                        }
-                    }
-                }
-                break;
-            }
-        }
-        
-        // judge if the call successful
-        if (sent) {
-            cout << "rpcCacheCall finished" << endl;
-        } else {
-            // if none server could be called, request cache from binder
-            result = cache_request(name, argTypes);
-            
-            if (result == 0) {
-                // call the server directly
-                for (server_list_it = (*cache.back())->server_list.begin(); server_list_it != (*cache.back())->server_list.end(); server_list_it++) {
-                    
-                    // open connection to requested server
-                    char *server_host_name;
-                    char *server_port_num;
-                    
-                    // get server address and port from environment variable
-                    server_host_name = (*server_list_it)->first;
-                    server_port_num = (*server_list_it)->second;
-                    
-                    // call the server directly
-                    result = directSendToServer(server_host_name, server_port_num);
-                    
-                    if (result == 0) {
-                        // call the server successfully
-                        sent = true;
-                        
-                        // modify the cache according to round robin
-                        for (it = cache.begin(); it != cache.end(); it++) {
-                            for (server_list_it = (*it)->server_list.begin(); server_list_it != (*it)->server_list.end(); server_list_it++) {
-                                if ((*server_list_it)->first == server_host_name) {
-                                    (*it)->server_list.splice((*it)->server_list.end(), (*it)->server_list, server_list_it);
-                                }
-                            }
-                        }
-                        break;
-                    }
-                }
-                
-                // judge if the call successful
-                if (sent) {
-                    cout << "rpcCacheCall finished" << endl;
-                } else {
-                    return -1;
-                }
-            } else {
-                return result;
-            }
-        }
-        
-    } else {
-        // request cache from binder
-        result = cache_request(name, argTypes);
-        
-        if (result == 0) {
-            // call the server directly
-            for (server_list_it = (*cache.back())->server_list.begin(); server_list_it != (*cache.back())->server_list.end(); server_list_it++) {
-                
-                // open connection to requested server
-                char *server_host_name;
-                char *server_port_num;
-                
-                // get server address and port from environment variable
-                server_host_name = (*server_list_it)->first;
-                server_port_num = (*server_list_it)->second;
-                
-                // call the server directly
-                result = directSendToServer(server_host_name, server_port_num);
-                
-                if (result == 0) {
-                    // call the server successfully
-                    sent = true;
-                    
-                    // modify the cache according to round robin
-                    for (it = cache.begin(); it != cache.end(); it++) {
-                        for (server_list_it = (*it)->server_list.begin(); server_list_it != (*it)->server_list.end(); server_list_it++) {
-                            if ((*server_list_it)->first == server_host_name) {
-                                (*it)->server_list.splice((*it)->server_list.end(), (*it)->server_list, server_list_it);
-                            }
-                        }
-                    }
-                    break;
-                }
-            }
-            
-            // judge if the call successful
-            if (sent) {
-                cout << "rpcCacheCall finished" << endl;
-            } else {
-                return -1;
-            }
-            
-        } else {
-            return result;
-        }
-        
-        
-        // modify the cache according to round robin
-        
-    }
-    
-}
-
-return 0;
-}
-
-void directSendToServer(char* server_host_name, char* server_port_num) {
+int directSendToServer(char* server_host_name, char* server_port_num, char* name, int* argTypes, int argTypesSize, void** args) {
     
     list<pair<char*, char*> >::iterator server_list_it;
     int result;
+    int msglen;
+    int msgtype;
+    int nbytes;
     
     
     struct addrinfo server_hints, *server_res, *server_counter;		// addrinfo for specifying and getting info and a counter
@@ -550,11 +363,11 @@ void directSendToServer(char* server_host_name, char* server_port_num) {
         int execLen;					// total size of the buffer
         int *argLen_arr;				// array to track each arg length
         
-        argLen_arr = new int[argType_size-1];
+        argLen_arr = new int[argTypesSize-1];
         
-        execLen = LENGTH_SIZE + TYPE_SIZE + NAME_SIZE + ARGTYPE_SIZE * argType_size;
+        execLen = LENGTH_SIZE + TYPE_SIZE + NAME_SIZE + ARGTYPE_SIZE * argTypesSize;
         
-        for (int i = 0; i < argType_size - 1; i++) {
+        for (int i = 0; i < argTypesSize - 1; i++) {
             int arg_type = (argTypes[i] >> (8*2)) & 0xff;
             int arg_length = argTypes[i] & 0xffff;
             
@@ -597,11 +410,11 @@ void directSendToServer(char* server_host_name, char* server_port_num) {
         memcpy(execReq, &msglen, LENGTH_SIZE);
         memcpy(execReq+LENGTH_SIZE, &msgtype, TYPE_SIZE);
         strcpy(execReq+LENGTH_SIZE+TYPE_SIZE, name);
-        memcpy(execReq+LENGTH_SIZE+TYPE_SIZE+NAME_SIZE, argTypes, ARGTYPE_SIZE * argType_size);
+        memcpy(execReq+LENGTH_SIZE+TYPE_SIZE+NAME_SIZE, argTypes, ARGTYPE_SIZE * argTypesSize);
         
-        char *temp = execReq + LENGTH_SIZE + TYPE_SIZE + NAME_SIZE + ARGTYPE_SIZE * argType_size;			// temp iterator
+        char *temp = execReq + LENGTH_SIZE + TYPE_SIZE + NAME_SIZE + ARGTYPE_SIZE * argTypesSize;			// temp iterator
         
-        for (int j=0; j < argType_size-1; j++) {
+        for (int j=0; j < argTypesSize-1; j++) {
             memcpy(temp, args[j], argLen_arr[j]);
             temp = temp + argLen_arr[j];
         }
@@ -620,11 +433,13 @@ void directSendToServer(char* server_host_name, char* server_port_num) {
         
         if ((nbytes = (int) recv(server_sock, &exec_replyLen, sizeof(int), 0)) <= 0) {
             close(server_sock);
+            cout << "0" << endl;
             return ERECV;
         }
         
         if ((nbytes = (int) recv(server_sock, &exec_replyType, sizeof(int), 0)) <= 0) {
             close(server_sock);
+            cout << "1" << endl;
             return ERECV;
         }
         
@@ -633,6 +448,7 @@ void directSendToServer(char* server_host_name, char* server_port_num) {
         if ((nbytes = (int) recv(server_sock, msgbuf2, exec_replyLen, 0)) <= 0) {
             delete [] msgbuf2;
             close(server_sock);
+            cout << "2" << endl;
             return ERECV;
         }
         
@@ -665,7 +481,7 @@ void directSendToServer(char* server_host_name, char* server_port_num) {
     
 }
 
-int cache_request(char* name, int* argTypes) {
+int cache_request(char* name, int* argTypes, int argType_size) {
     list<pair<char*, char*> >::iterator server_list_it;
     
     int msgType;
@@ -675,7 +491,7 @@ int cache_request(char* name, int* argTypes) {
     
     int result;					// for error checking
     int ret_type;				// whether REGISTER_SUCCESS or REGISTER_FAILURE
-    int ret_val;				// warnings or errors returned
+    char *ret_val;				// warnings or errors returned
     int ret_len;                // length of receieved message
     
     struct Message *reply;      // the reply message
@@ -688,10 +504,10 @@ int cache_request(char* name, int* argTypes) {
     sendBuf = new char[LENGTH_SIZE + TYPE_SIZE + sendLength];
     msgType = CACHE_REQUEST;
     
-    memcpy(buf, &sendLength, LENGTH_SIZE);
-    memcpy(buf+LENGTH_SIZE, &msgtype, TYPE_SIZE);
-    strcpy(buf+LENGTH_SIZE+TYPE_SIZE, name);
-    memcpy(buf+LENGTH_SIZE+TYPE_SIZE+NAME_SIZE, argTypes, argType_size);
+    memcpy(sendBuf, &sendLength, LENGTH_SIZE);
+    memcpy(sendBuf+LENGTH_SIZE, &msgType, TYPE_SIZE);
+    strcpy(sendBuf+LENGTH_SIZE+TYPE_SIZE, name);
+    memcpy(sendBuf+LENGTH_SIZE+TYPE_SIZE+NAME_SIZE, argTypes, argType_size);
     
     // send CACHE_REQUEST to binder
     result = (int) send(binder_sock, sendBuf, LENGTH_SIZE + TYPE_SIZE + sendLength, 0);
@@ -701,22 +517,25 @@ int cache_request(char* name, int* argTypes) {
     
     // receive the reply from binder
     result = (int) recv(binder_sock, &ret_len, 4, 0);
+    cout << "3" << endl;
     if (result < 0) return ERECV;
     result = (int) recv(binder_sock, &ret_type, 4, 0);
+    cout << "4" << endl;
     if (result < 0) return ERECV;
     result = (int) recv(binder_sock, &ret_val, 4, 0);
+    cout << "5" << endl;
     if (result < 0) return ERECV;
     
     msgBuf = new char[ret_len];
     
     
-    if (reply->type == CACHE_SUCCESS) {        
-        struct cache_entry *cacheEntry = new struct cache_entry();
-        cacheEntry->name = name;
-        cacheEntry->argTypes = argTypes;
+    if (ret_type == CACHE_SUCCESS) {
+        cache_entry cacheEntry;
+        cacheEntry.name = name;
+        cacheEntry.argTypes = argTypes;
         
         // loop to get each servers info from the reply message
-        numServers = ret_len/(SERVER_ID_SIZE + PORT_SIZE);
+        int numServers = ret_len/(SERVER_ID_SIZE + PORT_SIZE);
         for (int i = 0; i < numServers; i++) {
             pair<char*, char*> server_list_entry;
             
@@ -729,25 +548,218 @@ int cache_request(char* name, int* argTypes) {
             ret_val = ret_val + PORT_SIZE;
             
             server_list_entry = make_pair(server_id, server_port);
-            cacheEntry->server_list.push_back(server_list_entry);
+            cacheEntry.server_list.push_back(server_list_entry);
         }
         
         // add this cache entry to the list
         cache.push_back(cacheEntry);
         return 0;
     }
-    else if (loc_replyType == CACHE_FAILURE) {
+    else if (ret_type == CACHE_FAILURE) {
         reply = parseMessage(msgBuf, CACHE_FAILURE, ret_len);
     	int errcode = reply->reasonCode;
         
     	delete reply;
     	delete [] msgBuf;
-		close(client_binder_sock);
+		close(binder_sock);
 		
 		return errcode;
         
     }
 }
+
+
+extern int rpcCacheCall(char* name, int* argTypes, void** args) {
+    
+    list<cache_entry>::iterator it;
+    list<pair<char*, char*> >::iterator server_list_it;
+    
+    int msgType;
+    int sendLength;
+    char *sendBuf;
+    char *msgBuf;
+    
+    int counter;
+    int result;
+    bool sent;
+    
+    // get the number of argument types
+    int argTypesSize = 0;
+    for (int i = 0; argTypes[i] != 0; i++) argTypesSize++;
+    argTypesSize++;
+    
+    // bool value to indicate if we found the same function
+    bool found = false;
+    
+    // loop to scan the database for the same function
+    for (it = cache.begin(); it != cache.end(); it++) {
+        if (!strcmp(name, it->name) && (argTypesSize == it->argTypeSize)) {
+            int counter = argTypesSize - 1;
+            while (counter >= 0) {
+                if (argTypes[counter] != it->argTypes[counter]) {
+                    break;
+                }
+                //check that input output bits are the same, and same type for stored and current
+                int s_pre_arg = (int)it->argTypes[counter] & 0xffff0000;
+                int c_pre_arg = (int)argTypes[counter] & 0xffff0000;
+                
+                if (s_pre_arg != c_pre_arg) break;
+                
+                // check that they are both scalar or both arrays
+                int server_arg_len = (int)it->argTypes[counter] & 0xffff;
+                int curr_arg_len = (int)argTypes[counter] & 0xffff;
+                
+                if (!(((server_arg_len > 0) && (curr_arg_len > 0)) || ((server_arg_len == 0) && (curr_arg_len == 0)))) break;
+                
+                // both inout are same, type is the same, and they or both scalar or both arrays
+                // then check the next argument type
+                counter--;
+            }
+            if (counter == -1) {
+                found = true;
+                // if found same function, break out of the loop
+                break;
+            }
+        }
+    }
+    
+    if (found) {
+        sent = false;
+        
+        for (server_list_it = it->server_list.begin(); server_list_it != it->server_list.end(); server_list_it++) {
+            
+            // open connection to requested server
+            char *server_host_name;
+            char *server_port_num;
+            
+            // get server address and port from environment variable
+            server_host_name = server_list_it->first;
+            server_port_num = server_list_it->second;
+            
+            // call the server directly
+            result = directSendToServer(server_host_name, server_port_num, name, argTypes, argTypesSize, args);
+            
+            if (result == 0) {
+                // call the server successfully
+                sent = true;
+                
+                // modify the cache according to round robin
+                for (it = cache.begin(); it != cache.end(); it++) {
+                    for (server_list_it = it->server_list.begin(); server_list_it != it->server_list.end(); server_list_it++) {
+                        if (server_list_it->first == server_host_name) {
+                            it->server_list.splice(it->server_list.end(), it->server_list, server_list_it);
+                        }
+                    }
+                }
+                break;
+            }
+        }
+        
+        // judge if the call successful
+        if (sent) {
+            cout << "rpcCacheCall finished" << endl;
+        } else {
+            // if none server could be called, request cache from binder
+            result = cache_request(name, argTypes, argTypesSize);
+            sent = false;
+            if (result == 0) {
+                // call the server directly
+                for (server_list_it = (cache.back()).server_list.begin(); server_list_it != (cache.back()).server_list.end(); server_list_it++) {
+                    
+                    // open connection to requested server
+                    char *server_host_name;
+                    char *server_port_num;
+                    
+                    // get server address and port from environment variable
+                    server_host_name = server_list_it->first;
+                    server_port_num = server_list_it->second;
+                    
+                    // call the server directly
+                    result = directSendToServer(server_host_name, server_port_num, name, argTypes, argTypesSize, args);
+                    
+                    if (result == 0) {
+                        // call the server successfully
+                        sent = true;
+                        
+                        // modify the cache according to round robin
+                        for (it = cache.begin(); it != cache.end(); it++) {
+                            for (server_list_it = it->server_list.begin(); server_list_it != it->server_list.end(); server_list_it++) {
+                                if (server_list_it->first == server_host_name) {
+                                    it->server_list.splice(it->server_list.end(), it->server_list, server_list_it);
+                                }
+                            }
+                        }
+                        break;
+                    }
+                }
+                
+                // judge if the call successful
+                if (sent) {
+                    cout << "rpcCacheCall finished" << endl;
+                } else {
+                    return -1;
+                }
+            } else {
+                return result;
+            }
+        }
+        
+    } else {
+        // request cache from binder
+        result = cache_request(name, argTypes, argTypesSize);
+        
+        sent = false;
+        if (result == 0) {
+            // call the server directly
+            for (server_list_it = (cache.back()).server_list.begin(); server_list_it != (cache.back()).server_list.end(); server_list_it++) {
+                
+                // open connection to requested server
+                char *server_host_name;
+                char *server_port_num;
+                
+                // get server address and port from environment variable
+                server_host_name = server_list_it->first;
+                server_port_num = server_list_it->second;
+                
+                // call the server directly
+                result = directSendToServer(server_host_name, server_port_num, name, argTypes, argTypesSize, args);
+                
+                if (result == 0) {
+                    // call the server successfully
+                    sent = true;
+                    
+                    // modify the cache according to round robin
+                    for (it = cache.begin(); it != cache.end(); it++) {
+                        for (server_list_it = it->server_list.begin(); server_list_it != it->server_list.end(); server_list_it++) {
+                            if (server_list_it->first == server_host_name) {
+                                it->server_list.splice(it->server_list.end(), it->server_list, server_list_it);
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+            
+            // judge if the call successful
+            if (sent) {
+                cout << "rpcCacheCall finished" << endl;
+            } else {
+                return -1;
+            }
+            
+        } else {
+            return result;
+        }
+        
+        
+        // modify the cache according to round robin
+        
+    }
+    return 0;
+    
+}
+
+
 
 extern int rpcRegister(char* name, int* argTypes, skeleton f) {
     // count size of argTypes

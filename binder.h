@@ -28,7 +28,7 @@ std::list<db_struct*> binder_db;
 std::vector<int> servers;
 
 // a vector for caching
-std::vector<std::pair<char*, char*> > cache;
+std::vector<std::pair<char*, char*> > cache_db;
 
 
 #endif /* defined(__RPC__binder__) */

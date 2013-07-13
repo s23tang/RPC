@@ -21,6 +21,7 @@
 #define TERMINATE           9
 #define CACHE_REQUEST       11
 #define CACHE_FAILURE       12
+#define CACHE_SUCCESS       13
 
 #define REGISTER_WARNING    10
 

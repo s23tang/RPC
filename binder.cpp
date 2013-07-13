@@ -340,7 +340,7 @@ int main(int argc, const char *argv[]) {
                                             break;
                                         }
                                         case CACHE_REQUEST: {
-                                            
+                                            cout << "CACHE_REQUEST" << endl;
                                             // parse the message we recieved
                                             msg = parseMessage(strBuf, typeBuf, lenBuf);
                                             
@@ -375,16 +375,16 @@ int main(int argc, const char *argv[]) {
                                                         if (counter == -1) {
                                                             found = true;
                                                             // if found same function, cache them for processing
-                                                            cache.push_back(make_pair(((*it)->address, (*it)->port)));
+                                                            cache_db.push_back(make_pair((*it)->address, (*it)->port));
                                                         }
                                                     }
                                                 }
                                             }
                                             
                                             if (found) {
-                                                vector<char*>::iterator cache_it;
-                                                int sendBufLength = LENGTH_SIZE + TYPE_SIZE + cache.size() * SERVER_ID_SIZE + cache.size() * PORT_SIZE;
-                                                int cacheLength = cache.size() * SERVER_ID_SIZE + cache.size() * PORT_SIZE;
+                                                vector<pair<char*, char*> >::iterator cache_it;
+                                                int sendBufLength = LENGTH_SIZE + TYPE_SIZE + cache_db.size() * SERVER_ID_SIZE + cache_db.size() * PORT_SIZE;
+                                                int cacheLength = cache_db.size() * SERVER_ID_SIZE + cache_db.size() * PORT_SIZE;
                                                 int msgType = CACHE_SUCCESS;
                                                 
                                                 // create the CACHE_SUCCESS message
@@ -395,9 +395,9 @@ int main(int argc, const char *argv[]) {
                                                 
                                                 // loop to add server address to the message with specific function name
                                                 int counter = 0;
-                                                for (cache_it = cache.begin(); cache_it != cache.end(); cache_it++) {
-                                                    memcpy(sendBuf, (*cache_it)->first, SERVER_ID_SIZE);
-                                                    strcpy(sendBuf, (*cache_it)->second);
+                                                for (cache_it = cache_db.begin(); cache_it != cache_db.end(); cache_it++) {
+                                                    memcpy(sendBuf, cache_it->first, SERVER_ID_SIZE);
+                                                    strcpy(sendBuf, cache_it->second);
                                                     sendBuf = sendBuf + SERVER_ID_SIZE + PORT_SIZE;
                                                     counter++;
                                                 }
@@ -420,7 +420,7 @@ int main(int argc, const char *argv[]) {
                                                 
                                             }
                                             
-                                            cache.clear();
+                                            cache_db.clear();
                                             break;
                                         }
                                             
