@@ -181,12 +181,14 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
             break;
         case TERMINATE:
             break;
+        case CACHE_FAILURE:
         case REGISTER_SUCCESS:
         case REGISTER_FAILURE:
         case LOC_FAILURE:
         case EXECUTE_FAILURE:
             // get the warning/error code
             memcpy(&msg->reasonCode, buf, RCODE_SIZE);
+            cout << "true reasoncode" <<msg->reasonCode << endl;
             break;
         default:
             break;
@@ -244,6 +246,7 @@ int createMessage(char **buf, int msgType, int retCode, struct Message *oldMsg) 
         case CACHE_FAILURE:
         case LOC_FAILURE: {
             // allocate enough memory for the buffer and update the length of the buffer
+            cout << "createMessage: " << retCode << endl;
             msgLength = LENGTH_SIZE + TYPE_SIZE + sizeof(int);
             (*buf) = new char[msgLength];
             

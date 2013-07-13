@@ -433,13 +433,13 @@ int directSendToServer(char* server_host_name, char* server_port_num, char* name
         
         if ((nbytes = (int) recv(server_sock, &exec_replyLen, sizeof(int), 0)) <= 0) {
             close(server_sock);
-            cout << "0" << endl;
+            cout <<"1"<<endl;
             return ERECV;
         }
         
         if ((nbytes = (int) recv(server_sock, &exec_replyType, sizeof(int), 0)) <= 0) {
             close(server_sock);
-            cout << "1" << endl;
+            cout <<"2"<<endl;
             return ERECV;
         }
         
@@ -448,7 +448,7 @@ int directSendToServer(char* server_host_name, char* server_port_num, char* name
         if ((nbytes = (int) recv(server_sock, msgbuf2, exec_replyLen, 0)) <= 0) {
             delete [] msgbuf2;
             close(server_sock);
-            cout << "2" << endl;
+            cout <<"3"<<endl;
             return ERECV;
         }
         
@@ -483,7 +483,6 @@ int directSendToServer(char* server_host_name, char* server_port_num, char* name
 
 int cache_request(char* name, int* argTypes, int argType_size) {
     list<pair<char*, char*> >::iterator server_list_it;
-    
     int msgType;
     int sendLength;
     char *sendBuf;
@@ -491,10 +490,42 @@ int cache_request(char* name, int* argTypes, int argType_size) {
     
     int result;					// for error checking
     int ret_type;				// whether REGISTER_SUCCESS or REGISTER_FAILURE
-    char *ret_val;				// warnings or errors returned
     int ret_len;                // length of receieved message
     
     struct Message *reply;      // the reply message
+    
+    // open connection to binder
+	char *host_name;						// binder address
+	char *port_num;							// binder port
+	struct addrinfo hints, *res, *counter;	// addrinfo for specifying and getting info and a counter
+	int binder_sock;					// socket for connection with binder
+	
+	// get server address and port from environment variable
+	host_name = getenv("BINDER_ADDRESS");
+	port_num = getenv("BINDER_PORT");
+	
+	// specify to use TCP instead of datagram
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_PASSIVE;
+	
+	if (getaddrinfo(host_name, port_num, &hints, &res) != 0) return EGADDR;
+	
+	// go along the linked list for a valid entry
+	for(counter = res; counter != NULL; counter = counter->ai_next) {
+		binder_sock = socket(counter->ai_family, counter->ai_socktype, counter->ai_protocol);
+		if (binder_sock == -1) continue;	// has not found a socket descriptor
+		
+		result = connect(binder_sock, counter->ai_addr, counter->ai_addrlen);
+		if (result == -1) continue; // cannot connect to socket
+		
+		break;						// found good socket descriptor
+	}
+	if (counter == NULL) return ESOCK;
+    
+	freeaddrinfo(res);
+
     
     
     // if we cannot find the same function
@@ -507,7 +538,10 @@ int cache_request(char* name, int* argTypes, int argType_size) {
     memcpy(sendBuf, &sendLength, LENGTH_SIZE);
     memcpy(sendBuf+LENGTH_SIZE, &msgType, TYPE_SIZE);
     strcpy(sendBuf+LENGTH_SIZE+TYPE_SIZE, name);
-    memcpy(sendBuf+LENGTH_SIZE+TYPE_SIZE+NAME_SIZE, argTypes, argType_size);
+    
+    memcpy(sendBuf+LENGTH_SIZE+TYPE_SIZE+NAME_SIZE, argTypes, argType_size * 4);
+    
+    cout << "binder sock: " << binder_sock << endl;
     
     // send CACHE_REQUEST to binder
     result = (int) send(binder_sock, sendBuf, LENGTH_SIZE + TYPE_SIZE + sendLength, 0);
@@ -517,19 +551,21 @@ int cache_request(char* name, int* argTypes, int argType_size) {
     
     // receive the reply from binder
     result = (int) recv(binder_sock, &ret_len, 4, 0);
-    cout << "3" << endl;
     if (result < 0) return ERECV;
     result = (int) recv(binder_sock, &ret_type, 4, 0);
-    cout << "4" << endl;
     if (result < 0) return ERECV;
-    result = (int) recv(binder_sock, &ret_val, 4, 0);
-    cout << "5" << endl;
-    if (result < 0) return ERECV;
+
     
-    msgBuf = new char[ret_len];
-    
-    
+//    msgBuf = new char[ret_len];
+    cout << ret_len << endl;
+
+    cout << ret_type << endl;
     if (ret_type == CACHE_SUCCESS) {
+        char *ret_val;
+        result = (int) recv(binder_sock, &ret_val, ret_len, 0);
+        cout <<"6"<<endl;
+        if (result < 0) return ERECV;
+        
         cache_entry cacheEntry;
         cacheEntry.name = name;
         cacheEntry.argTypes = argTypes;
@@ -556,13 +592,20 @@ int cache_request(char* name, int* argTypes, int argType_size) {
         return 0;
     }
     else if (ret_type == CACHE_FAILURE) {
-        reply = parseMessage(msgBuf, CACHE_FAILURE, ret_len);
-    	int errcode = reply->reasonCode;
+        int ret_val;
+        result = (int) recv(binder_sock, &ret_val, 4, 0);
+        cout <<"6.5"<<endl;
+        if (result < 0) return ERECV;
+
         
-    	delete reply;
-    	delete [] msgBuf;
+        cout << "10" <<endl;
+//        reply = parseMessage(ret_val, CACHE_FAILURE, ret_len);
+
+    	int errcode = ret_val;
+
 		close(binder_sock);
-		
+        cout << "reply: " << errcode << endl;
+
 		return errcode;
         
     }
@@ -660,6 +703,7 @@ extern int rpcCacheCall(char* name, int* argTypes, void** args) {
             cout << "rpcCacheCall finished" << endl;
         } else {
             // if none server could be called, request cache from binder
+            cout <<"7"<<endl;
             result = cache_request(name, argTypes, argTypesSize);
             sent = false;
             if (result == 0) {
@@ -706,24 +750,30 @@ extern int rpcCacheCall(char* name, int* argTypes, void** args) {
         
     } else {
         // request cache from binder
+        cout <<"8"<<endl;
         result = cache_request(name, argTypes, argTypesSize);
-        
+        cout << "result: " << result << endl;
         sent = false;
         if (result == 0) {
+            it = cache.begin();
+            while (it != cache.end()) {
+                it++;
+            };
+            cout << it->name << endl;
             // call the server directly
-            for (server_list_it = (cache.back()).server_list.begin(); server_list_it != (cache.back()).server_list.end(); server_list_it++) {
-                
+            for (server_list_it = it->server_list.begin(); server_list_it != it->server_list.end(); server_list_it++) {
+                cout << "11" << endl;
                 // open connection to requested server
                 char *server_host_name;
                 char *server_port_num;
-                
+                cout << "noob" << endl;
+
                 // get server address and port from environment variable
                 server_host_name = server_list_it->first;
                 server_port_num = server_list_it->second;
-                
                 // call the server directly
                 result = directSendToServer(server_host_name, server_port_num, name, argTypes, argTypesSize, args);
-                
+                cout << "send result: " << result << endl;
                 if (result == 0) {
                     // call the server successfully
                     sent = true;

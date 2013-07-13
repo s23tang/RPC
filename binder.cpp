@@ -351,6 +351,9 @@ int main(int argc, const char *argv[]) {
                                             if (binder_db.size() != 0){
                                                 for (it = binder_db.begin(); it != binder_db.end(); it++) {
                                                     if (!strcmp(msg->name, (*it)->name) && (msg->argTypesSize == (*it)->argTypeSize)) {
+                                                        cout << (*it)->name << endl;
+                                                        cout << (*it)->argTypeSize << endl;
+
                                                         int counter = msg->argTypesSize - 1;
                                                         while (counter >= 0) {
                                                             if (msg->argTypes[counter] != (*it)->argTypes[counter]) {
@@ -382,6 +385,7 @@ int main(int argc, const char *argv[]) {
                                             }
                                             
                                             if (found) {
+                                                cout << "cache_db_size: " << cache_db.size() << endl;
                                                 vector<pair<char*, char*> >::iterator cache_it;
                                                 int sendBufLength = LENGTH_SIZE + TYPE_SIZE + cache_db.size() * SERVER_ID_SIZE + cache_db.size() * PORT_SIZE;
                                                 int cacheLength = cache_db.size() * SERVER_ID_SIZE + cache_db.size() * PORT_SIZE;
@@ -391,27 +395,26 @@ int main(int argc, const char *argv[]) {
                                                 sendBuf = new char[sendBufLength];
                                                 memcpy(sendBuf, &cacheLength, LENGTH_SIZE);
                                                 memcpy(sendBuf + LENGTH_SIZE, &msgType, TYPE_SIZE);
+
                                                 sendBuf = sendBuf + LENGTH_SIZE + TYPE_SIZE;
-                                                
                                                 // loop to add server address to the message with specific function name
-                                                int counter = 0;
                                                 for (cache_it = cache_db.begin(); cache_it != cache_db.end(); cache_it++) {
                                                     memcpy(sendBuf, cache_it->first, SERVER_ID_SIZE);
                                                     strcpy(sendBuf, cache_it->second);
                                                     sendBuf = sendBuf + SERVER_ID_SIZE + PORT_SIZE;
-                                                    counter++;
                                                 }
-                                                
+                                                sendBuf = sendBuf - sendBufLength;
                                                 // send the server list to the client
-                                                result = (int) send(i, sendBuf, cacheLength, 0);
+                                                result = (int) send(i, sendBuf, sendBufLength, 0);
+
                                                 if (result < 0) {
                                                     cerr << "Binder: Send error, CACHE_SUCCESS." << endl;
                                                 }
-                                                
-                                                
+
                                             } else {
                                                 // if we cannot find the same function
                                                 // just send the CACHE_FAILURE and the reasnoCode
+                                                cout << "createMessage: " << endl;
                                                 int sendLength = createMessage(&sendBuf, CACHE_FAILURE, -11, msg);
                                                 result = (int) send(i, sendBuf, sendLength, 0);
                                                 if (result < 0) {
