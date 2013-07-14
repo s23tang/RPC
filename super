@@ -2,5 +2,7 @@ g++ -c server_functions.c
 g++ -c server_function_skels.c
 g++ -c server.c
 g++ -pthread -L. server_functions.o server_function_skels.o server.o -lrpc -o server
+g++ -c server2.c
+g++ -pthread -L. server_functions.o server_function_skels.o server2.o -lrpc -o server2
 g++ -c client.c
 g++ -pthread -L. client.o -lrpc -o client

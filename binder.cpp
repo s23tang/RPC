@@ -353,7 +353,7 @@ int main(int argc, const char *argv[]) {
                                             }
                                             
                                             for (it = binder_db.begin(); it != binder_db.end(); it++) {
-                                                if ((*it)->address == msg->server_identifier) {
+                                                if (!strcmp((*it)->address, msg->server_identifier) && !strcmp((*it)->port, msg->port) ) {
                                                     // put the functions within the same server to the end of the database
                                                     binder_db.splice(binder_db.end(), binder_db, it);
                                                 }
