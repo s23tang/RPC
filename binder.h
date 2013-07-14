@@ -21,11 +21,17 @@ struct db_struct {
 	char *port;
 };
 
+struct server_info {
+	char *address;
+	char *port;
+	int sockfd;
+};
+
 // a list used as a function database
 std::list<db_struct*> binder_db;
 
 // a vector to record connected servers
-std::vector<int> servers;
+std::vector<server_info*> servers;
 
 // a vector for caching
 std::vector<std::pair<char*, char*> > cache_db;
