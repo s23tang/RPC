@@ -2,8 +2,8 @@
 //  message.cpp
 //  RPC
 //
-//  Created by Haochen Ding on 2013-06-28.
-//  Copyright (c) 2013 Haochen Ding. All rights reserved.
+//  Created by Haochen Ding & Shisong Tang on 2013-06-26.
+//  Copyright (c) 2013 Haochen Ding & Shisong Tang. All rights reserved.
 //
 
 #include "message.h"
@@ -188,7 +188,6 @@ struct Message *parseMessage(char *buf, int msgType, int length) {
         case EXECUTE_FAILURE:
             // get the warning/error code
             memcpy(&msg->reasonCode, buf, RCODE_SIZE);
-            cout << "true reasoncode" <<msg->reasonCode << endl;
             break;
         default:
             break;

@@ -2,8 +2,8 @@
 //  rpc.cpp
 //  RPC
 //
-//  Created by Haochen Ding on 2014-06-26.
-//  Copyright (c) 2013 Haochen Ding and the mastermind Shisong Tang. All rights reserved.
+//  Created by Haochen Ding & Shisong Tang on 2013-06-26.
+//  Copyright (c) 2013 Haochen Ding & Shisong Tang. All rights reserved.
 //
 #include <iostream>
 #include <list>
@@ -17,6 +17,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <pthread.h>
+#include <errno.h>
 
 #include "error.h"
 #include "initialization.h"
@@ -325,13 +326,11 @@ extern int rpcCall(char* name, int* argTypes, void** args) {
 }
 
 int directSendToServer(char* server_host_name, char* server_port_num, char* name, int* argTypes, int argTypesSize, void** args) {
-    
     list<pair<char*, char*> >::iterator server_list_it;
     int result;
     int msglen;
     int msgtype;
     int nbytes;
-    
     
     struct addrinfo server_hints, *server_res, *server_counter;		// addrinfo for specifying and getting info and a counter
     int server_sock;												// socket for server
@@ -343,143 +342,140 @@ int directSendToServer(char* server_host_name, char* server_port_num, char* name
     server_hints.ai_flags = AI_PASSIVE;
     
     if (getaddrinfo(server_host_name, server_port_num, &server_hints, &server_res) != 0) return EGADDR;
-    
     // go along the linked list for a valid entry
     for(server_counter = server_res; server_counter != NULL; server_counter = server_counter->ai_next) {
         server_sock = socket(server_counter->ai_family, server_counter->ai_socktype, server_counter->ai_protocol);
         if (server_sock == -1) continue;	// has not found a socket descriptor
-        
+                
         result = connect(server_sock, server_counter->ai_addr, server_counter->ai_addrlen);
-        if (result == -1) continue; // cannot connect to socket
+        
+        if (result == -1) {
+            continue;
+        }
+            //continue; // cannot connect to socket
         
         break;						// found good socket descriptor
+    }
+    if (server_counter == NULL) return ESOCK;
+
+    freeaddrinfo(server_res);
+    
+    // form the execute message
+    char *execReq;					// execute buffer to send the execute message
+    int execLen;					// total size of the buffer
+    int *argLen_arr;				// array to track each arg length
+    
+    argLen_arr = new int[argTypesSize-1];
+    
+    execLen = LENGTH_SIZE + TYPE_SIZE + NAME_SIZE + ARGTYPE_SIZE * argTypesSize;
+    for (int i = 0; i < argTypesSize - 1; i++) {
+        int arg_type = (argTypes[i] >> (8*2)) & 0xff;
+        int arg_length = argTypes[i] & 0xffff;
         
-        if (server_counter == NULL) return ESOCK;
-        
-        freeaddrinfo(server_res);
-        
-        // form the execute message
-        char *execReq;					// execute buffer to send the execute message
-        int execLen;					// total size of the buffer
-        int *argLen_arr;				// array to track each arg length
-        
-        argLen_arr = new int[argTypesSize-1];
-        
-        execLen = LENGTH_SIZE + TYPE_SIZE + NAME_SIZE + ARGTYPE_SIZE * argTypesSize;
-        
-        for (int i = 0; i < argTypesSize - 1; i++) {
-            int arg_type = (argTypes[i] >> (8*2)) & 0xff;
-            int arg_length = argTypes[i] & 0xffff;
-            
-            int size_of_type;
-            if (arg_type == ARG_CHAR) {
-                size_of_type = sizeof(char);
-            }
-            else if (arg_type == ARG_SHORT) {
-                size_of_type = sizeof(short);
-            }
-            else if (arg_type == ARG_INT) {
-                size_of_type = sizeof(int);
-            }
-            else if (arg_type == ARG_LONG) {
-                size_of_type = sizeof(long);
-            }
-            else if (arg_type == ARG_DOUBLE) {
-                size_of_type = sizeof(double);
-            }
-            else if (arg_type == ARG_FLOAT) {
-                size_of_type = sizeof(float);
-            }
-            if (arg_length == 0) {
-                argLen_arr[i] = size_of_type;
-                execLen = execLen + size_of_type;
-            }
-            else {
-                argLen_arr[i] = size_of_type * arg_length;
-                execLen = execLen + size_of_type * arg_length;
-            }
+        int size_of_type;
+        if (arg_type == ARG_CHAR) {
+            size_of_type = sizeof(char);
         }
-        
-        execReq = new char[execLen];
-        
-        msglen = execLen - LENGTH_SIZE - TYPE_SIZE;
-        
-        msgtype = EXECUTE;
-        
-        // place the information into the execute message buffer
-        memcpy(execReq, &msglen, LENGTH_SIZE);
-        memcpy(execReq+LENGTH_SIZE, &msgtype, TYPE_SIZE);
-        strcpy(execReq+LENGTH_SIZE+TYPE_SIZE, name);
-        memcpy(execReq+LENGTH_SIZE+TYPE_SIZE+NAME_SIZE, argTypes, ARGTYPE_SIZE * argTypesSize);
-        
-        char *temp = execReq + LENGTH_SIZE + TYPE_SIZE + NAME_SIZE + ARGTYPE_SIZE * argTypesSize;			// temp iterator
-        
-        for (int j=0; j < argTypesSize-1; j++) {
-            memcpy(temp, args[j], argLen_arr[j]);
-            temp = temp + argLen_arr[j];
+        else if (arg_type == ARG_SHORT) {
+            size_of_type = sizeof(short);
         }
-        
-        // finished packing the execute message, time to send
-        if (send(server_sock, execReq, execLen, 0) == -1) {
-            cerr << "ERROR: could not send execute message from function (" << name << ") to server " << server_host_name << endl;
-            return ESEND;
+        else if (arg_type == ARG_INT) {
+            size_of_type = sizeof(int);
         }
-        
-        // sent execute message to server, time to parse received results
-        
-        // nbytes is the total of bytes received
-        int exec_replyLen;                          // length of execute request reply msg
-        int exec_replyType;                         // type of the execute request reply
-        
-        if ((nbytes = (int) recv(server_sock, &exec_replyLen, sizeof(int), 0)) <= 0) {
-            close(server_sock);
-            cout <<"1"<<endl;
-            return ERECV;
+        else if (arg_type == ARG_LONG) {
+            size_of_type = sizeof(long);
         }
-        
-        if ((nbytes = (int) recv(server_sock, &exec_replyType, sizeof(int), 0)) <= 0) {
-            close(server_sock);
-            cout <<"2"<<endl;
-            return ERECV;
+        else if (arg_type == ARG_DOUBLE) {
+            size_of_type = sizeof(double);
         }
-        
-        char *msgbuf2 = new char[exec_replyLen];
-        
-        if ((nbytes = (int) recv(server_sock, msgbuf2, exec_replyLen, 0)) <= 0) {
-            delete [] msgbuf2;
-            close(server_sock);
-            cout <<"3"<<endl;
-            return ERECV;
+        else if (arg_type == ARG_FLOAT) {
+            size_of_type = sizeof(float);
         }
-        
-        Message *exec_reply;
-        
-        if (exec_replyType == EXECUTE_FAILURE) {
-            exec_reply = parseMessage(msgbuf2, EXECUTE_FAILURE, exec_replyLen);
-            int errcode = exec_reply->reasonCode;
-            
-            delete exec_reply;
-            delete [] msgbuf2;
-            close(server_sock);
-            
-            return errcode;
+        if (arg_length == 0) {
+            argLen_arr[i] = size_of_type;
+            execLen = execLen + size_of_type;
         }
-        else if (exec_replyType == EXECUTE_SUCCESS) {
-            exec_reply = parseMessage(msgbuf2, EXECUTE_SUCCESS, exec_replyLen);
-            for (int argcounter=0; exec_reply->argTypes[argcounter]!=0; argcounter++) {
-                argTypes[argcounter] = exec_reply->argTypes[argcounter];
-                args[argcounter] = exec_reply->args[argcounter];
-            }
-            
-            close(server_sock);
-            
+        else {
+            argLen_arr[i] = size_of_type * arg_length;
+            execLen = execLen + size_of_type * arg_length;
         }
     }
-    // if we got here, then this rpcCacheCall is finished
+    
+    execReq = new char[execLen];
+    
+    msglen = execLen - LENGTH_SIZE - TYPE_SIZE;
+    
+    msgtype = EXECUTE;
+    
+    // place the information into the execute message buffer
+    memcpy(execReq, &msglen, LENGTH_SIZE);
+    memcpy(execReq+LENGTH_SIZE, &msgtype, TYPE_SIZE);
+    strcpy(execReq+LENGTH_SIZE+TYPE_SIZE, name);
+    memcpy(execReq+LENGTH_SIZE+TYPE_SIZE+NAME_SIZE, argTypes, ARGTYPE_SIZE * argTypesSize);
+    
+    char *temp = execReq + LENGTH_SIZE + TYPE_SIZE + NAME_SIZE + ARGTYPE_SIZE * argTypesSize;			// temp iterator
+    
+    
+    for (int j=0; j < argTypesSize-1; j++) {
+        memcpy(temp, args[j], argLen_arr[j]);
+        temp = temp + argLen_arr[j];
+    }
+    
+    // finished packing the execute message, time to send
+    if (send(server_sock, execReq, execLen, 0) == -1) {
+        cerr << "ERROR: could not send execute message from function (" << name << ") to server " << server_host_name << endl;
+        return ESEND;
+    }
+    
+    // sent execute message to server, time to parse received results
+    
+    // nbytes is the total of bytes received
+    int exec_replyLen;                          // length of execute request reply msg
+    int exec_replyType;                         // type of the execute request reply
+    
+    if ((nbytes = (int) recv(server_sock, &exec_replyLen, sizeof(int), 0)) <= 0) {
+        close(server_sock);
+        return ERECV;
+    }
+    
+    if ((nbytes = (int) recv(server_sock, &exec_replyType, sizeof(int), 0)) <= 0) {
+        close(server_sock);
+        return ERECV;
+    }
+    
+    char *msgbuf2 = new char[exec_replyLen];
+    
+    if ((nbytes = (int) recv(server_sock, msgbuf2, exec_replyLen, 0)) <= 0) {
+        delete [] msgbuf2;
+        close(server_sock);
+        return ERECV;
+    }
+    
+    Message *exec_reply;
+    
+    if (exec_replyType == EXECUTE_FAILURE) {
+        exec_reply = parseMessage(msgbuf2, EXECUTE_FAILURE, exec_replyLen);
+        int errcode = exec_reply->reasonCode;
+        
+        delete exec_reply;
+        delete [] msgbuf2;
+        close(server_sock);
+        
+        return errcode;
+    }
+    else if (exec_replyType == EXECUTE_SUCCESS) {
+        exec_reply = parseMessage(msgbuf2, EXECUTE_SUCCESS, exec_replyLen);
+        for (int argcounter=0; exec_reply->argTypes[argcounter]!=0; argcounter++) {
+            argTypes[argcounter] = exec_reply->argTypes[argcounter];
+            args[argcounter] = exec_reply->args[argcounter];
+        }
+        
+        close(server_sock);
+        
+    }
     return 0;
-    
-    
 }
+
 
 int cache_request(char* name, int* argTypes, int argType_size) {
     list<pair<char*, char*> >::iterator server_list_it;
@@ -525,7 +521,7 @@ int cache_request(char* name, int* argTypes, int argType_size) {
 	if (counter == NULL) return ESOCK;
     
 	freeaddrinfo(res);
-
+    
     
     
     // if we cannot find the same function
@@ -541,8 +537,6 @@ int cache_request(char* name, int* argTypes, int argType_size) {
     
     memcpy(sendBuf+LENGTH_SIZE+TYPE_SIZE+NAME_SIZE, argTypes, argType_size * 4);
     
-    cout << "binder sock: " << binder_sock << endl;
-    
     // send CACHE_REQUEST to binder
     result = (int) send(binder_sock, sendBuf, LENGTH_SIZE + TYPE_SIZE + sendLength, 0);
     if (result < 0) {
@@ -554,21 +548,20 @@ int cache_request(char* name, int* argTypes, int argType_size) {
     if (result < 0) return ERECV;
     result = (int) recv(binder_sock, &ret_type, 4, 0);
     if (result < 0) return ERECV;
-
     
-//    msgBuf = new char[ret_len];
-    cout << ret_len << endl;
-
-    cout << ret_type << endl;
+    
+    //    msgBuf = new char[ret_len];
+    
     if (ret_type == CACHE_SUCCESS) {
         char *ret_val;
-        result = (int) recv(binder_sock, &ret_val, ret_len, 0);
-        cout <<"6"<<endl;
+        ret_val = new char[ret_len];
+        result = (int) recv(binder_sock, ret_val, ret_len, 0);
         if (result < 0) return ERECV;
         
         cache_entry cacheEntry;
         cacheEntry.name = name;
         cacheEntry.argTypes = argTypes;
+        cacheEntry.argTypeSize = argType_size;
         
         // loop to get each servers info from the reply message
         int numServers = ret_len/(SERVER_ID_SIZE + PORT_SIZE);
@@ -589,23 +582,21 @@ int cache_request(char* name, int* argTypes, int argType_size) {
         
         // add this cache entry to the list
         cache.push_back(cacheEntry);
+        close(binder_sock);
+
         return 0;
     }
     else if (ret_type == CACHE_FAILURE) {
         int ret_val;
         result = (int) recv(binder_sock, &ret_val, 4, 0);
-        cout <<"6.5"<<endl;
         if (result < 0) return ERECV;
-
         
-        cout << "10" <<endl;
-//        reply = parseMessage(ret_val, CACHE_FAILURE, ret_len);
-
+        //        reply = parseMessage(ret_val, CACHE_FAILURE, ret_len);
+        
     	int errcode = ret_val;
-
+        
 		close(binder_sock);
-        cout << "reply: " << errcode << endl;
-
+        
 		return errcode;
         
     }
@@ -636,6 +627,7 @@ extern int rpcCacheCall(char* name, int* argTypes, void** args) {
     
     // loop to scan the database for the same function
     for (it = cache.begin(); it != cache.end(); it++) {
+
         if (!strcmp(name, it->name) && (argTypesSize == it->argTypeSize)) {
             int counter = argTypesSize - 1;
             while (counter >= 0) {
@@ -675,13 +667,12 @@ extern int rpcCacheCall(char* name, int* argTypes, void** args) {
             char *server_host_name;
             char *server_port_num;
             
-            // get server address and port from environment variable
+            // get server address and port
             server_host_name = server_list_it->first;
             server_port_num = server_list_it->second;
-            
+                        
             // call the server directly
             result = directSendToServer(server_host_name, server_port_num, name, argTypes, argTypesSize, args);
-            
             if (result == 0) {
                 // call the server successfully
                 sent = true;
@@ -703,12 +694,20 @@ extern int rpcCacheCall(char* name, int* argTypes, void** args) {
             cout << "rpcCacheCall finished" << endl;
         } else {
             // if none server could be called, request cache from binder
-            cout <<"7"<<endl;
+            // remove the old server list
+            cache.erase(it);
             result = cache_request(name, argTypes, argTypesSize);
             sent = false;
             if (result == 0) {
+                it = cache.begin();
+                counter = cache.size() - 1;
+                while (counter != 0) {
+                    it++;
+                    counter--;
+                };
+
                 // call the server directly
-                for (server_list_it = (cache.back()).server_list.begin(); server_list_it != (cache.back()).server_list.end(); server_list_it++) {
+                for (server_list_it = it->server_list.begin(); server_list_it != it->server_list.end(); server_list_it++) {
                     
                     // open connection to requested server
                     char *server_host_name;
@@ -722,7 +721,6 @@ extern int rpcCacheCall(char* name, int* argTypes, void** args) {
                     result = directSendToServer(server_host_name, server_port_num, name, argTypes, argTypesSize, args);
                     
                     if (result == 0) {
-                        // call the server successfully
                         sent = true;
                         
                         // modify the cache according to round robin
@@ -750,30 +748,26 @@ extern int rpcCacheCall(char* name, int* argTypes, void** args) {
         
     } else {
         // request cache from binder
-        cout <<"8"<<endl;
         result = cache_request(name, argTypes, argTypesSize);
-        cout << "result: " << result << endl;
         sent = false;
         if (result == 0) {
             it = cache.begin();
-            while (it != cache.end()) {
+            counter = cache.size() - 1;
+            while (counter != 0) {
                 it++;
+                counter--;
             };
-            cout << it->name << endl;
             // call the server directly
             for (server_list_it = it->server_list.begin(); server_list_it != it->server_list.end(); server_list_it++) {
-                cout << "11" << endl;
                 // open connection to requested server
                 char *server_host_name;
                 char *server_port_num;
-                cout << "noob" << endl;
-
+                
                 // get server address and port from environment variable
                 server_host_name = server_list_it->first;
                 server_port_num = server_list_it->second;
                 // call the server directly
                 result = directSendToServer(server_host_name, server_port_num, name, argTypes, argTypesSize, args);
-                cout << "send result: " << result << endl;
                 if (result == 0) {
                     // call the server successfully
                     sent = true;
@@ -918,6 +912,7 @@ extern int rpcRegister(char* name, int* argTypes, skeleton f) {
 // this function will parse msg and send results to client
 void *ExecFunc(void *threadarg)
 {
+    cout << "Executing..." << endl;
     thread_data *execArg = (thread_data *)threadarg;	// get the structure containing message and socket id
     char *unparsedMsg = execArg->message;				// get the raw message
     

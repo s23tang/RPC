@@ -2,8 +2,8 @@
 //  binder.cpp
 //  RPC
 //
-//  Created by Haochen Ding & Shisong Tang on 2013-06-26.
-//  Copyright (c) 2013 Haochen Ding & Shisong Tang. All rights reserved.
+//  Created by Haochen Ding on 2013-06-26.
+//  Copyright (c) 2013 Haochen Ding. All rights reserved.
 //
 #include <iostream>
 #include <stdio.h>
@@ -340,6 +340,7 @@ int main(int argc, const char *argv[]) {
                                             break;
                                         }
                                         case CACHE_REQUEST: {
+                                            
                                             // parse the message we recieved
                                             msg = parseMessage(strBuf, typeBuf, lenBuf);
                                             
@@ -350,7 +351,6 @@ int main(int argc, const char *argv[]) {
                                             if (binder_db.size() != 0){
                                                 for (it = binder_db.begin(); it != binder_db.end(); it++) {
                                                     if (!strcmp(msg->name, (*it)->name) && (msg->argTypesSize == (*it)->argTypeSize)) {
-
                                                         int counter = msg->argTypesSize - 1;
                                                         while (counter >= 0) {
                                                             if (msg->argTypes[counter] != (*it)->argTypes[counter]) {
@@ -375,14 +375,14 @@ int main(int argc, const char *argv[]) {
                                                         if (counter == -1) {
                                                             found = true;
                                                             // if found same function, cache them for processing
-                                                            cache_db.push_back(make_pair((*it)->address, (*it)->port));
+                                                            cache_db.push_back(make_pair(((*it)->address, (*it)->port)));
                                                         }
                                                     }
                                                 }
                                             }
                                             
                                             if (found) {
-                                                vector<pair<char*, char*> >::iterator cache_it;
+                                                vector<char*>::iterator cache_it;
                                                 int sendBufLength = LENGTH_SIZE + TYPE_SIZE + cache_db.size() * SERVER_ID_SIZE + cache_db.size() * PORT_SIZE;
                                                 int cacheLength = cache_db.size() * SERVER_ID_SIZE + cache_db.size() * PORT_SIZE;
                                                 int msgType = CACHE_SUCCESS;
@@ -391,24 +391,24 @@ int main(int argc, const char *argv[]) {
                                                 sendBuf = new char[sendBufLength];
                                                 memcpy(sendBuf, &cacheLength, LENGTH_SIZE);
                                                 memcpy(sendBuf + LENGTH_SIZE, &msgType, TYPE_SIZE);
-
                                                 sendBuf = sendBuf + LENGTH_SIZE + TYPE_SIZE;
+                                                
                                                 // loop to add server address to the message with specific function name
+                                                int counter = 0;
                                                 for (cache_it = cache_db.begin(); cache_it != cache_db.end(); cache_it++) {
-
-                                                    memcpy(sendBuf, cache_it->first, SERVER_ID_SIZE);
-                                                    sendBuf = sendBuf + SERVER_ID_SIZE;
-                                                    strcpy(sendBuf, cache_it->second);
-                                                    sendBuf = sendBuf + PORT_SIZE;
+                                                    memcpy(sendBuf, (*cache_it)->first, SERVER_ID_SIZE);
+                                                    strcpy(sendBuf, (*cache_it)->second);
+                                                    sendBuf = sendBuf + SERVER_ID_SIZE + PORT_SIZE;
+                                                    counter++;
                                                 }
-                                                sendBuf = sendBuf - sendBufLength;
+                                                
                                                 // send the server list to the client
-                                                result = (int) send(i, sendBuf, sendBufLength, 0);
-
+                                                result = (int) send(i, sendBuf, cacheLength, 0);
                                                 if (result < 0) {
                                                     cerr << "Binder: Send error, CACHE_SUCCESS." << endl;
                                                 }
-
+                                                
+                                                
                                             } else {
                                                 // if we cannot find the same function
                                                 // just send the CACHE_FAILURE and the reasnoCode
