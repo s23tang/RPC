@@ -691,7 +691,6 @@ extern int rpcCacheCall(char* name, int* argTypes, void** args) {
         
         // judge if the call successful
         if (sent) {
-            cout << "rpcCacheCall finished" << endl;
         } else {
             // if none server could be called, request cache from binder
             // remove the old server list
@@ -737,7 +736,6 @@ extern int rpcCacheCall(char* name, int* argTypes, void** args) {
                 
                 // judge if the call successful
                 if (sent) {
-                    cout << "rpcCacheCall finished" << endl;
                 } else {
                     return -1;
                 }
@@ -786,7 +784,6 @@ extern int rpcCacheCall(char* name, int* argTypes, void** args) {
             
             // judge if the call successful
             if (sent) {
-                cout << "rpcCacheCall finished" << endl;
             } else {
                 return -1;
             }

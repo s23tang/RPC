@@ -245,7 +245,6 @@ int createMessage(char **buf, int msgType, int retCode, struct Message *oldMsg) 
         case CACHE_FAILURE:
         case LOC_FAILURE: {
             // allocate enough memory for the buffer and update the length of the buffer
-            cout << "createMessage: " << retCode << endl;
             msgLength = LENGTH_SIZE + TYPE_SIZE + sizeof(int);
             (*buf) = new char[msgLength];
             
